@@ -512,3 +512,24 @@ Verification: typecheck; reload; `running`; README commands copy-pasted and run 
   separation. Settings are plain JSON, so snippets must not contain secrets; the editor says so.
 - **Remote hosts**: the server reads the daemon host's filesystem, which is where the workspace
   lives, so this is correct for remote daemons too; the plugin must be installed on that daemon.
+
+## Spike results (Task 1, 2026-10-01, Paseo 0.10.2 desktop)
+
+Observed with a throwaway panel installed as `snippets-spike` from the worktree workspace
+`spike/terminal-tabs` (removed afterwards):
+
+- (a) A terminal created with `workspaces.ref(id).terminals.create({ name, cwd })` from plugin
+  client code appears **immediately** as a workspace terminal tab named after `name`, and it
+  **takes focus**.
+- (b) Not needed (a holds).
+- (c) `write("echo hello")` + `sendKeys(["Enter"])` right after `create` is kept: `capture` shows
+  `hello`. No prompt wait is needed.
+- (d) Closing the tab in the UI kills the terminal: `terminals.list()` no longer returns it.
+- (e) In a worktree workspace, `projectRootPath` is the original checkout and `directory` is the
+  worktree path. The settings keys stay as in section 3.
+
+**Decision: branch A.** The terminal tab is the main output view. `OutputPreview` stays an optional,
+collapsed peek. After Run/Restart, the row shows "Opened in terminal tab `<name>`". Branch-C extras
+(auto-expand, Send input, orphaned terminals) are dropped. Because a new terminal takes focus,
+Run on a *missing* terminal moves the user to the new tab; Restart/Stop on an open terminal do
+not create one, so they leave focus on the panel.
