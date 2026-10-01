@@ -7,7 +7,17 @@ A Paseo plugin for running command snippets and package.json scripts in workspac
 - **Package scripts**: Automatically detects scripts in the root `package.json` and runs them using the appropriate package manager (npm, pnpm, yarn, bun).
 - **Saved snippets**: Save custom commands with project or workspace scope.
 - **Terminal orchestration**: Creates and manages interactive workspace terminal tabs with Run, Restart, Stop, Close, and inline output peek.
-- **Quick access**: Command Center integration (⌘K "Open snippets") and `/snippet <name>` slash command.
+- **Quick access**: a **Snippets** sidebar screen (works before any workspace exists), a **Snippets** button on every workspace header, Command Center (⌘K "Open snippets"), and the `/snippet <name>` slash command.
+
+## Screenshots
+
+![Snippets screen: reorderable project list on the left, package.json scripts and saved snippets on the right](images/01-snippets-screen.png)
+
+![Snippets entry in the Paseo sidebar](images/02-sidebar-entry.png)
+
+![Snippets button in the workspace header](images/03-header-button.png)
+
+![Open snippets from the Command Center](images/04-command-center.png)
 
 ## Install
 

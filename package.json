@@ -1,6 +1,6 @@
 {
   "name": "paseo-workspace-snippets",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "files": [
     "paseo-plugin.json",
     "index.client.tsx",
@@ -9,7 +9,8 @@
     "server/",
     "shared/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "images/"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit"
