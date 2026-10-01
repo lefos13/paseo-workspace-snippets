@@ -2,15 +2,16 @@ import type {
   PluginButtonRegistration,
   PluginClientContext,
 } from "@getpaseo/plugin/client";
-import type {
-  OwnedSubscription,
-  PaseoWorkspaceListResult,
-} from "@getpaseo/client";
+
+/** The part of the SDK's owned workspace subscription this module uses. */
+interface ReleasableSubscription {
+  release(): Promise<void>;
+}
 
 export function registerHeaderButtons(client: PluginClientContext): () => void {
   const buttons = new Map<string, PluginButtonRegistration>();
   let stopped = false;
-  let subscription: OwnedSubscription<PaseoWorkspaceListResult> | null = null;
+  let subscription: ReleasableSubscription | null = null;
 
   const register = (workspaceId: string) => {
     if (stopped || buttons.has(workspaceId)) return;
