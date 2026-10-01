@@ -9,21 +9,31 @@ export const EntryInput = WorkspaceInput.extend({
   entryKey: z.string().regex(/^(script|snippet):.+$/),
 });
 
+export const ProjectInput = z.object({
+  projectId: z.string().min(1),
+});
+
+export const ProjectEntryInput = ProjectInput.extend({
+  entryKey: z.string().regex(/^(script|snippet):.+$/),
+});
+
+export const detectScriptsOutput = z.object({
+  status: z.enum(["ok", "missing", "invalid"]),
+  error: z.string().nullable(),
+  packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]),
+  scripts: z.array(
+    z.object({
+      name: z.string(),
+      body: z.string(),
+      command: z.string(),
+    }),
+  ),
+});
+
 export const detectScriptsRpc = defineRpc({
   name: "scripts.detect",
   input: WorkspaceInput,
-  output: z.object({
-    status: z.enum(["ok", "missing", "invalid"]),
-    error: z.string().nullable(),
-    packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]),
-    scripts: z.array(
-      z.object({
-        name: z.string(),
-        body: z.string(),
-        command: z.string(),
-      }),
-    ),
-  }),
+  output: detectScriptsOutput,
 });
 
 export const terminalStatesRpc = defineRpc({
@@ -81,4 +91,29 @@ export const listEntriesRpc = defineRpc({
   name: "entry.list", // slash command with no args, error hints
   input: WorkspaceInput,
   output: z.object({ names: z.array(z.string()) }),
+});
+
+export const projectDetectRpc = defineRpc({
+  name: "project.detect",
+  input: ProjectInput,
+  output: detectScriptsOutput,
+});
+
+export const projectStatesRpc = defineRpc({
+  name: "project.states",
+  input: ProjectInput,
+  output: z.object({
+    workspaceId: z.string().nullable(),
+    open: z.record(z.string(), z.string()),
+  }),
+});
+
+export const projectRunEntryRpc = defineRpc({
+  name: "project.run",
+  input: ProjectEntryInput,
+  output: z.object({
+    workspaceId: z.string(),
+    terminalId: z.string(),
+    created: z.boolean(),
+  }),
 });

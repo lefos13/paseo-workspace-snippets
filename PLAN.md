@@ -517,6 +517,27 @@ Verification: typecheck; reload; `running`; README commands copy-pasted and run 
 - **Remote hosts**: the server reads the daemon host's filesystem, which is where the workspace
   lives, so this is correct for remote daemons too; the plugin must be installed on that daemon.
 
+## 10. Sidebar screen (v0.2.0)
+
+Provides access to snippets from the **New workspace** screen before any workspace is opened.
+
+- **Registration**: Registered via `client.addSurface("snippets-home", SnippetsHome)` and `client.addSidebarItem({ id: "snippets", title: "Snippets", icon: "SquareTerminal", surface: "snippets-home" })`.
+- **Server additions (`server/projects.ts`)**:
+  - `resolveProject(paseo, projectId)`: Looks up project metadata (`projectId`, `projectRootPath`, `projectDisplayName`) via `paseo.projects.list()`; throws `PROJECT_UNAVAILABLE` if missing.
+  - `findLocalWorkspace(paseo, projectRootPath)`: Finds an active, non-archived workspace matching `directory === projectRootPath`, or `null`.
+- **RPC contracts (`shared/rpc.ts`)**:
+  - `project.detect`: Reuses `detectScripts(projectRootPath)` to list package.json scripts.
+  - `project.states`: Returns `{ workspaceId: string | null, open: Record<string, string> }` (empty `open` if no Local workspace).
+  - `project.run`: Opens or reuses the project's Local workspace via `paseo.workspaces.open(projectRootPath)`, resolves the entry with `resolveEntry`, and executes it in a dedicated terminal via `runTerminalEntry`.
+  - Existing `entry.stop`, `entry.close`, and `entry.output` RPCs are reused with the resolved `workspaceId`.
+- **Client surface (`client/home/SnippetsHome.tsx`)**:
+  - Project picker using `usePaseo().projects.list()`, rendered as horizontal wrap chips (vertical on compact layout); defaults to the first project in state.
+  - Scripts and Project snippets sections reusing `ScriptsSection`, `EntryRow`, `SnippetEditor`, and `makeStyles`.
+  - Only project-scoped snippets are listed; `SnippetEditor` locks scope to `"project"` via the `lockedScope="project"` prop.
+  - Polling `project.states` every 3s. Stop, Close, and preview are only offered when `workspaceId` exists and the entry is open.
+  - Run/Restart executes `project.run`, invalidates states query, and calls `navigation?.openWorkspace({ workspaceId })` (with a toast fallback if `navigation` is unavailable).
+  - Handles empty states: no projects ("Add a project in Paseo first"), no snippets, and missing/invalid package.json.
+
 ## Spike results (Task 1, 2026-10-01, Paseo 0.10.2 desktop)
 
 Observed with a throwaway panel installed as `snippets-spike` from the worktree workspace

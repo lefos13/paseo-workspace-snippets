@@ -6,7 +6,7 @@ import { OutputPreview } from "./OutputPreview";
 import { makeStyles } from "./styles";
 
 export interface EntryRowProps {
-  workspaceId: string;
+  workspaceId?: string | null;
   name: string;
   command: string;
   scope?: "project" | "workspace";
@@ -18,6 +18,7 @@ export interface EntryRowProps {
   isActionPending: boolean;
   actionsDisabled?: boolean;
   showTabHint: boolean;
+  canPreview?: boolean;
   onRun: () => void;
   onRestart: () => void;
   onStop: () => void;
@@ -39,6 +40,7 @@ export function EntryRow({
   isActionPending,
   actionsDisabled = false,
   showTabHint,
+  canPreview,
   onRun,
   onRestart,
   onStop,
@@ -49,6 +51,8 @@ export function EntryRow({
   const styles = useMemo(() => makeStyles(theme, compact), [theme, compact]);
   const [expanded, setExpanded] = useState(false);
   const disabled = isActionPending || actionsDisabled;
+  const showPreview =
+    canPreview !== undefined ? canPreview : Boolean(workspaceId);
 
   const statusIndicator = (
     <View style={styles.statusContainer}>
@@ -166,7 +170,7 @@ export function EntryRow({
         </Pressable>
       ) : null}
 
-      {chevronButton}
+      {showPreview ? chevronButton : null}
     </View>
   );
 
@@ -176,16 +180,17 @@ export function EntryRow({
     </Text>
   ) : null;
 
-  const outputPreview = expanded ? (
-    <OutputPreview
-      workspaceId={workspaceId}
-      entryKey={entryKey}
-      entryName={name}
-      isOpen={isOpen}
-      theme={theme}
-      compact={compact}
-    />
-  ) : null;
+  const outputPreview =
+    expanded && workspaceId && showPreview ? (
+      <OutputPreview
+        workspaceId={workspaceId}
+        entryKey={entryKey}
+        entryName={name}
+        isOpen={isOpen}
+        theme={theme}
+        compact={compact}
+      />
+    ) : null;
 
   const scopeBadge = scope ? (
     <View style={styles.scopeBadge}>

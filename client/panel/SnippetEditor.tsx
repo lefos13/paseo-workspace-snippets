@@ -11,6 +11,7 @@ export interface SnippetEditorProps {
   snippet?: Snippet | null;
   allSnippets: Snippet[];
   hasProjectRoot: boolean;
+  lockedScope?: "project";
   isTerminalOpen?: boolean;
   theme: PluginTheme;
   compact: boolean;
@@ -27,6 +28,7 @@ export function SnippetEditor({
   snippet,
   allSnippets,
   hasProjectRoot,
+  lockedScope,
   isTerminalOpen = false,
   theme,
   compact,
@@ -41,7 +43,7 @@ export function SnippetEditor({
   const [name, setName] = useState(snippet?.name ?? "");
   const [command, setCommand] = useState(snippet?.command ?? "");
   const [scope, setScope] = useState<"project" | "workspace">(
-    snippet?.scope ?? (hasProjectRoot ? "project" : "workspace"),
+    lockedScope ?? snippet?.scope ?? (hasProjectRoot ? "project" : "workspace"),
   );
   const [errors, setErrors] = useState<{ name?: string; command?: string }>({});
   const [confirmingDelete, setConfirmingDelete] = useState(initialConfirmDelete);
@@ -52,13 +54,15 @@ export function SnippetEditor({
     if (open) {
       setName(snippet?.name ?? "");
       setCommand(snippet?.command ?? "");
-      setScope(snippet?.scope ?? (hasProjectRoot ? "project" : "workspace"));
+      setScope(
+        lockedScope ?? snippet?.scope ?? (hasProjectRoot ? "project" : "workspace"),
+      );
       setErrors({});
       setConfirmingDelete(Boolean(initialConfirmDelete));
       setConfirmingRename(false);
       setIsDeleting(false);
     }
-  }, [open, snippet, hasProjectRoot, initialConfirmDelete]);
+  }, [open, snippet, hasProjectRoot, lockedScope, initialConfirmDelete]);
 
   const proceedWithSave = async (closeOldTerminal: boolean) => {
     const trimmedName = name.trim();
@@ -70,7 +74,7 @@ export function SnippetEditor({
         `snp_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`,
       name: trimmedName,
       command: trimmedCommand,
-      scope,
+      scope: lockedScope ?? scope,
     };
 
     const success = await onSave(itemToSave, closeOldTerminal);
@@ -289,57 +293,66 @@ export function SnippetEditor({
           ) : null}
         </View>
 
-        <View style={styles.fieldGroup}>
-          <Text style={styles.fieldLabel}>Scope</Text>
-          <View style={styles.segmentedControl}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Scope: This project for snippet ${currentSnippetName}`}
-              style={
-                scope === "project"
-                  ? styles.segmentedButtonActive
-                  : styles.segmentedButton
-              }
-              onPress={() => setScope("project")}
-            >
-              <Text
+        {lockedScope ? (
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Scope</Text>
+            <Text style={styles.fieldHint}>
+              Project snippets are shared by all worktrees of this repository.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Scope</Text>
+            <View style={styles.segmentedControl}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Scope: This project for snippet ${currentSnippetName}`}
                 style={
                   scope === "project"
-                    ? styles.segmentedButtonActiveText
-                    : styles.segmentedButtonText
+                    ? styles.segmentedButtonActive
+                    : styles.segmentedButton
                 }
+                onPress={() => setScope("project")}
               >
-                This project
-              </Text>
-            </Pressable>
+                <Text
+                  style={
+                    scope === "project"
+                      ? styles.segmentedButtonActiveText
+                      : styles.segmentedButtonText
+                  }
+                >
+                  This project
+                </Text>
+              </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Scope: This workspace for snippet ${currentSnippetName}`}
-              style={
-                scope === "workspace"
-                  ? styles.segmentedButtonActive
-                  : styles.segmentedButton
-              }
-              onPress={() => setScope("workspace")}
-            >
-              <Text
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Scope: This workspace for snippet ${currentSnippetName}`}
                 style={
                   scope === "workspace"
-                    ? styles.segmentedButtonActiveText
-                    : styles.segmentedButtonText
+                    ? styles.segmentedButtonActive
+                    : styles.segmentedButton
                 }
+                onPress={() => setScope("workspace")}
               >
-                This workspace
-              </Text>
-            </Pressable>
+                <Text
+                  style={
+                    scope === "workspace"
+                      ? styles.segmentedButtonActiveText
+                      : styles.segmentedButtonText
+                  }
+                >
+                  This workspace
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={styles.fieldHint}>
+              {scope === "project"
+                ? "Project snippets are shared by all worktrees of this repository."
+                : "Workspace snippets are only available in this directory."}
+            </Text>
           </View>
-          <Text style={styles.fieldHint}>
-            {scope === "project"
-              ? "Project snippets are shared by all worktrees of this repository."
-              : "Workspace snippets are only available in this directory."}
-          </Text>
-        </View>
+        )}
 
         <Text style={styles.fieldHint}>
           Snippets are saved unencrypted in host settings. Do not store secrets

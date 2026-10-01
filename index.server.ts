@@ -8,6 +8,7 @@ import {
   runTerminalEntry,
   stopTerminalEntry,
 } from "./server/terminals";
+import { findLocalWorkspace, resolveProject } from "./server/projects";
 import { resolveWorkspace } from "./server/workspace";
 import { snippetsFor } from "./shared/entries";
 import {
@@ -15,6 +16,9 @@ import {
   detectScriptsRpc,
   entryOutputRpc,
   listEntriesRpc,
+  projectDetectRpc,
+  projectRunEntryRpc,
+  projectStatesRpc,
   runByNameRpc,
   runEntryRpc,
   stopEntryRpc,
@@ -146,6 +150,63 @@ export default function contribute(server: PluginServerContext) {
         );
       } catch (err) {
         console.error("[snippets] entryOutputRpc error:", err);
+        throw err;
+      }
+    },
+  );
+
+  server.handle(projectDetectRpc, async ({ projectId }, { paseo }) => {
+    try {
+      const project = await resolveProject(paseo, projectId);
+      return await detectScripts(project.projectRootPath);
+    } catch (err) {
+      console.error("[snippets] projectDetectRpc error:", err);
+      throw err;
+    }
+  });
+
+  server.handle(projectStatesRpc, async ({ projectId }, { paseo }) => {
+    try {
+      const project = await resolveProject(paseo, projectId);
+      const workspaceId = await findLocalWorkspace(
+        paseo,
+        project.projectRootPath,
+      );
+      if (!workspaceId) {
+        return { workspaceId: null, open: {} };
+      }
+      const open = await listTerminalStates(paseo, workspaceId);
+      return { workspaceId, open };
+    } catch (err) {
+      console.error("[snippets] projectStatesRpc error:", err);
+      throw err;
+    }
+  });
+
+  server.handle(
+    projectRunEntryRpc,
+    async ({ projectId, entryKey }, { paseo }) => {
+      try {
+        const project = await resolveProject(paseo, projectId);
+        const ws = await paseo.workspaces.open(project.projectRootPath);
+        const entry = await resolveEntry(settings, entryKey, {
+          directory: project.projectRootPath,
+          projectRootPath: project.projectRootPath,
+        });
+        const result = await runTerminalEntry(
+          paseo,
+          ws.id,
+          project.projectRootPath,
+          entry.terminalName,
+          entry.command,
+        );
+        return {
+          workspaceId: ws.id,
+          terminalId: result.terminalId,
+          created: result.created,
+        };
+      } catch (err) {
+        console.error("[snippets] projectRunEntryRpc error:", err);
         throw err;
       }
     },

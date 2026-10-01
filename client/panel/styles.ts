@@ -405,5 +405,52 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
       gap: 8,
       marginTop: 4,
     },
+    // Project picker styles
+    projectPickerSection: {
+      gap: 8,
+    },
+    projectPickerLabel: {
+      fontSize: 12,
+      fontWeight: "600" as const,
+      color: theme.colors.foregroundMuted,
+      textTransform: "uppercase" as const,
+      letterSpacing: 0.5,
+    },
+    projectPickerWrap: {
+      flexDirection: "row" as const,
+      flexWrap: "wrap" as const,
+      gap: 8,
+    },
+    projectPickerList: {
+      flexDirection: "column" as const,
+      gap: 8,
+    },
+    projectChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 6,
+      backgroundColor: theme.colors.surface1,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      gap: 2,
+    },
+    projectChipSelected: {
+      backgroundColor: theme.colors.surface2,
+      borderColor: theme.colors.accent,
+    },
+    projectChipName: {
+      fontSize: 13,
+      fontWeight: "500" as const,
+      color: theme.colors.foreground,
+    },
+    projectChipNameSelected: {
+      fontSize: 13,
+      fontWeight: "600" as const,
+      color: theme.colors.foreground,
+    },
+    projectChipPath: {
+      fontSize: 11,
+      color: theme.colors.foregroundMuted,
+    },
   };
 }

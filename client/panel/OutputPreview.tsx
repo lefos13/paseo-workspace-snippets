@@ -29,6 +29,7 @@ export function OutputPreview({
   const { data, isLoading } = useQuery({
     queryKey: ["output", workspaceId, entryKey],
     queryFn: () => getOutput({ workspaceId, entryKey, lines: 40 }),
+    enabled: Boolean(workspaceId && isOpen),
     refetchInterval: 1500,
   });
 

@@ -1,10 +1,19 @@
 import type { PluginClientContext } from "@getpaseo/plugin/client";
 import { registerHeaderButtons } from "./client/headerButtons";
+import { SnippetsHome } from "./client/home/SnippetsHome";
 import { SnippetsPanel } from "./client/panel/SnippetsPanel";
 import { runByNameRpc } from "./shared/rpc";
 
 export default function contribute(client: PluginClientContext) {
   const cleanupHeaderButtons = registerHeaderButtons(client);
+
+  const cleanupSurface = client.addSurface("snippets-home", SnippetsHome);
+  const cleanupSidebar = client.addSidebarItem({
+    id: "snippets",
+    title: "Snippets",
+    icon: "SquareTerminal",
+    surface: "snippets-home",
+  });
 
   client.addWorkspacePanel({
     id: "snippets",
@@ -45,5 +54,7 @@ export default function contribute(client: PluginClientContext) {
 
   return () => {
     cleanupHeaderButtons();
+    cleanupSurface();
+    cleanupSidebar();
   };
 }

@@ -8,12 +8,14 @@ import { EntryRow } from "./EntryRow";
 import { makeStyles } from "./styles";
 
 export interface SnippetsSectionProps {
-  workspaceId: string;
+  title?: string;
+  workspaceId?: string | null;
   snippets: Snippet[];
   openTerminals: Record<string, string>;
   pendingActionEntries: Record<string, boolean>;
   lastRunSnippetId: string | null;
   actionsDisabled?: boolean;
+  entryCanPreview?: (isOpen: boolean) => boolean;
   theme: PluginTheme;
   compact: boolean;
   onRun: (snippet: Snippet) => void;
@@ -26,12 +28,14 @@ export interface SnippetsSectionProps {
 }
 
 export function SnippetsSection({
+  title = "Snippets",
   workspaceId,
   snippets,
   openTerminals,
   pendingActionEntries,
   lastRunSnippetId,
   actionsDisabled = false,
+  entryCanPreview,
   theme,
   compact,
   onRun,
@@ -47,7 +51,7 @@ export function SnippetsSection({
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Snippets</Text>
+        <Text style={styles.sectionTitle}>{title}</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Add snippet"
@@ -89,6 +93,9 @@ export function SnippetsSection({
                 isActionPending={isActionPending}
                 actionsDisabled={actionsDisabled}
                 showTabHint={showTabHint}
+                canPreview={
+                  entryCanPreview ? entryCanPreview(isOpen) : undefined
+                }
                 onRun={() => onRun(snippet)}
                 onRestart={() => onRestart(snippet)}
                 onStop={() => onStop(snippet)}

@@ -3,6 +3,9 @@ export function mapErrorMessage(error: unknown): string {
   if (msg.includes("WORKSPACE_UNAVAILABLE")) {
     return "Workspace is not available on this host";
   }
+  if (msg.includes("PROJECT_UNAVAILABLE")) {
+    return "Project is not available on this host";
+  }
   if (msg.includes("TERMINALS_UNSUPPORTED")) {
     return "Update the Paseo daemon to run snippets";
   }
@@ -25,6 +28,11 @@ export function mapErrorMessage(error: unknown): string {
 export function isWorkspaceUnavailable(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
   return msg.includes("WORKSPACE_UNAVAILABLE");
+}
+
+export function isProjectUnavailable(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes("PROJECT_UNAVAILABLE");
 }
 
 export function isTerminalsUnsupported(error: unknown): boolean {

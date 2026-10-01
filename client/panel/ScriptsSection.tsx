@@ -7,7 +7,7 @@ import { EntryRow } from "./EntryRow";
 import { makeStyles } from "./styles";
 
 export interface ScriptsSectionProps {
-  workspaceId: string;
+  workspaceId?: string | null;
   directory?: string | null;
   status: "ok" | "missing" | "invalid";
   error: string | null;
@@ -19,6 +19,7 @@ export interface ScriptsSectionProps {
   pendingActionEntries: Record<string, boolean>;
   actionsDisabled?: boolean;
   lastRunKey: string | null;
+  entryCanPreview?: (isOpen: boolean) => boolean;
   theme: PluginTheme;
   compact: boolean;
   onRun: (scriptName: string) => void;
@@ -40,6 +41,7 @@ export function ScriptsSection({
   pendingActionEntries,
   actionsDisabled = false,
   lastRunKey,
+  entryCanPreview,
   theme,
   compact,
   onRun,
@@ -136,6 +138,9 @@ export function ScriptsSection({
                     isActionPending={isActionPending}
                     actionsDisabled={actionsDisabled}
                     showTabHint={showTabHint}
+                    canPreview={
+                      entryCanPreview ? entryCanPreview(isOpen) : undefined
+                    }
                     onRun={() => onRun(script.name)}
                     onRestart={() => onRestart(script.name)}
                     onStop={() => onStop(script.name)}
