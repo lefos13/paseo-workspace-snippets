@@ -2,7 +2,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { Icon, Modal, TextInput } from "@getpaseo/plugin/client/react-native";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import type { SaveResult, Snippet } from "../../shared/settings";
+import type { Snippet } from "../../shared/settings";
 import { makeStyles } from "./styles";
 
 export interface SnippetEditorProps {
@@ -16,8 +16,8 @@ export interface SnippetEditorProps {
   compact: boolean;
   saving?: boolean;
   saveError?: string | null;
-  onSave: (snippet: Snippet, closeOldTerminal?: boolean) => SaveResult;
-  onDelete?: (snippet: Snippet, closeTerminal?: boolean) => SaveResult;
+  onSave: (snippet: Snippet, closeOldTerminal?: boolean) => Promise<Boolean>;
+  onDelete?: (snippet: Snippet, closeTerminal?: boolean) => Promise<Boolean>;
   initialConfirmDelete?: boolean;
 }
 

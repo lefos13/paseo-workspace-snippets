@@ -16,6 +16,7 @@ export interface EntryRowProps {
   compact: boolean;
   isOpen: boolean;
   isActionPending: boolean;
+  actionsDisabled?: boolean;
   showTabHint: boolean;
   onRun: () => void;
   onRestart: () => void;
@@ -36,6 +37,7 @@ export function EntryRow({
   compact,
   isOpen,
   isActionPending,
+  actionsDisabled = false,
   showTabHint,
   onRun,
   onRestart,
@@ -46,6 +48,7 @@ export function EntryRow({
 }: EntryRowProps) {
   const styles = useMemo(() => makeStyles(theme, compact), [theme, compact]);
   const [expanded, setExpanded] = useState(false);
+  const disabled = isActionPending || actionsDisabled;
 
   const statusIndicator = (
     <View style={styles.statusContainer}>
@@ -78,9 +81,9 @@ export function EntryRow({
             accessibilityLabel={`Restart ${name}`}
             style={[
               styles.actionButton,
-              isActionPending && styles.actionButtonDisabled,
+              disabled && styles.actionButtonDisabled,
             ]}
-            disabled={isActionPending}
+            disabled={disabled}
             onPress={onRestart}
           >
             <Icon name="RotateCw" size={14} color={theme.colors.foreground} />
@@ -92,9 +95,9 @@ export function EntryRow({
             accessibilityLabel={`Stop ${name}`}
             style={[
               styles.actionButton,
-              isActionPending && styles.actionButtonDisabled,
+              disabled && styles.actionButtonDisabled,
             ]}
-            disabled={isActionPending}
+            disabled={disabled}
             onPress={onStop}
           >
             <Icon name="Square" size={14} color={theme.colors.foreground} />
@@ -106,9 +109,9 @@ export function EntryRow({
             accessibilityLabel={`Close ${name}`}
             style={[
               styles.actionButton,
-              isActionPending && styles.actionButtonDisabled,
+              disabled && styles.actionButtonDisabled,
             ]}
-            disabled={isActionPending}
+            disabled={disabled}
             onPress={onClose}
           >
             <Icon name="X" size={14} color={theme.colors.foreground} />
@@ -121,9 +124,9 @@ export function EntryRow({
           accessibilityLabel={`Run ${name}`}
           style={[
             styles.actionButton,
-            isActionPending && styles.actionButtonDisabled,
+            disabled && styles.actionButtonDisabled,
           ]}
-          disabled={isActionPending}
+          disabled={disabled}
           onPress={onRun}
         >
           <Icon name="Play" size={14} color={theme.colors.foreground} />
@@ -135,7 +138,11 @@ export function EntryRow({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Edit snippet ${name}`}
-          style={styles.actionButton}
+          style={[
+            styles.actionButton,
+            disabled && styles.actionButtonDisabled,
+          ]}
+          disabled={disabled}
           onPress={onEdit}
         >
           <Icon name="Pencil" size={14} color={theme.colors.foreground} />
@@ -147,7 +154,11 @@ export function EntryRow({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Delete snippet ${name}`}
-          style={styles.actionDangerButton}
+          style={[
+            styles.actionDangerButton,
+            disabled && styles.actionButtonDisabled,
+          ]}
+          disabled={disabled}
           onPress={onDelete}
         >
           <Icon name="Trash2" size={14} color={theme.colors.statusDanger} />

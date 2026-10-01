@@ -84,6 +84,7 @@ export default function contribute(server: PluginServerContext) {
 
   server.handle(terminalStatesRpc, async ({ workspaceId }, { paseo }) => {
     try {
+      await resolveWorkspace(paseo, workspaceId);
       const open = await listTerminalStates(paseo, workspaceId);
       return { open };
     } catch (err) {

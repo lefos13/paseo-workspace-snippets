@@ -17,6 +17,7 @@ export interface ScriptsSectionProps {
   onToggleShowScripts: () => void;
   openTerminals: Record<string, string>;
   pendingActionEntries: Record<string, boolean>;
+  actionsDisabled?: boolean;
   lastRunKey: string | null;
   theme: PluginTheme;
   compact: boolean;
@@ -37,6 +38,7 @@ export function ScriptsSection({
   onToggleShowScripts,
   openTerminals,
   pendingActionEntries,
+  actionsDisabled = false,
   lastRunKey,
   theme,
   compact,
@@ -132,6 +134,7 @@ export function ScriptsSection({
                     compact={compact}
                     isOpen={isOpen}
                     isActionPending={isActionPending}
+                    actionsDisabled={actionsDisabled}
                     showTabHint={showTabHint}
                     onRun={() => onRun(script.name)}
                     onRestart={() => onRestart(script.name)}

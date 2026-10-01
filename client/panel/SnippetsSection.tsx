@@ -13,6 +13,7 @@ export interface SnippetsSectionProps {
   openTerminals: Record<string, string>;
   pendingActionEntries: Record<string, boolean>;
   lastRunSnippetId: string | null;
+  actionsDisabled?: boolean;
   theme: PluginTheme;
   compact: boolean;
   onRun: (snippet: Snippet) => void;
@@ -30,6 +31,7 @@ export function SnippetsSection({
   openTerminals,
   pendingActionEntries,
   lastRunSnippetId,
+  actionsDisabled = false,
   theme,
   compact,
   onRun,
@@ -85,6 +87,7 @@ export function SnippetsSection({
                 compact={compact}
                 isOpen={isOpen}
                 isActionPending={isActionPending}
+                actionsDisabled={actionsDisabled}
                 showTabHint={showTabHint}
                 onRun={() => onRun(snippet)}
                 onRestart={() => onRestart(snippet)}

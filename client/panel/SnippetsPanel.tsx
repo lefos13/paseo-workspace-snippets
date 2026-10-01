@@ -17,38 +17,17 @@ import {
   stopEntryRpc,
   terminalStatesRpc,
 } from "../../shared/rpc";
-import type {
-  NullableString,
-  RevisionId,
-  SaveResult,
-  Snippet,
-  SnippetsSettingsValues,
-} from "../../shared/settings";
+import type { Snippet, SnippetsSettingsValues } from "../../shared/settings";
 import { snippetsSettings } from "../../shared/settings";
+import {
+  isTerminalsUnsupported,
+  isWorkspaceUnavailable,
+  mapErrorMessage,
+} from "./errors";
 import { ScriptsSection } from "./ScriptsSection";
 import { SnippetEditor } from "./SnippetEditor";
 import { SnippetsSection } from "./SnippetsSection";
 import { makeStyles } from "./styles";
-
-function mapErrorMessage(error: unknown): string {
-  const msg = error instanceof Error ? error.message : String(error);
-  if (msg.includes("WORKSPACE_UNAVAILABLE")) {
-    return "Workspace is not available on this host";
-  }
-  if (msg.includes("TERMINALS_UNSUPPORTED")) {
-    return "Update the Paseo daemon to run snippets";
-  }
-  if (msg.includes("PATH_OUTSIDE_WORKSPACE")) {
-    return "package.json is symlinked outside workspace";
-  }
-  if (msg.includes("ENTRY_NOT_FOUND")) {
-    return "Entry was not found";
-  }
-  if (msg.includes("AMBIGUOUS_NAME")) {
-    return msg.replace(/^.*AMBIGUOUS_NAME:\s*/, "");
-  }
-  return msg;
-}
 
 export function SnippetsPanel({
   theme,
@@ -71,7 +50,7 @@ export function SnippetsPanel({
   const closeEntry = useRpc(closeEntryRpc);
   const detectScripts = useRpc(detectScriptsRpc);
 
-  const { data: statesData } = useQuery({
+  const { data: statesData, error: statesError } = useQuery({
     queryKey: ["states", workspaceId],
     queryFn: () => getTerminalStates({ workspaceId }),
     refetchInterval: 3000,
@@ -93,15 +72,17 @@ export function SnippetsPanel({
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
   const [initialConfirmDelete, setInitialConfirmDelete] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [capturedRevision, setCapturedRevision] =
-    useState<NullableString>(null);
-  const [capturedValues, setCapturedValues] =
-    useState<SnippetsSettingsValues | null>(null);
+  const [capturedRevision, setCapturedRevision] = useState(
+    null as string | null,
+  );
+  const [capturedValues, setCapturedValues] = useState(
+    null as SnippetsSettingsValues | null,
+  );
 
   const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
     {},
   );
-  const [lastRunKey, setLastRunKey] = useState<NullableString>(null);
+  const [lastRunKey, setLastRunKey] = useState(null as string | null);
 
   const headerTitle = workspace?.name
     ? `Snippets · ${workspace.name}`
@@ -133,6 +114,11 @@ export function SnippetsPanel({
     () => scriptsData?.scripts ?? [],
     [scriptsData?.scripts],
   );
+
+  const workspaceUnavailable =
+    !workspace || isWorkspaceUnavailable(statesError);
+  const terminalsUnsupported = isTerminalsUnsupported(statesError);
+  const actionsDisabled = workspaceUnavailable || terminalsUnsupported;
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -335,7 +321,7 @@ export function SnippetsPanel({
   const handleSaveSnippet = async (
     itemToSave: Snippet,
     closeOldTerminal = false,
-  ): SaveResult => {
+  ) => {
     if (settings.status !== "ready" || !capturedRevision || !capturedValues) {
       return false;
     }
@@ -349,8 +335,8 @@ export function SnippetsPanel({
         await queryClient.invalidateQueries({
           queryKey: ["states", workspaceId],
         });
-      } catch (err) {
-        console.error("Failed to close old terminal on rename:", err);
+      } catch {
+        // Disappeared terminal is ignored
       }
     }
 
@@ -465,7 +451,7 @@ export function SnippetsPanel({
   const handleDeleteSnippet = async (
     snippet: Snippet,
     closeTerminal = false,
-  ): SaveResult => {
+  ) => {
     if (settings.status !== "ready") return false;
 
     if (closeTerminal) {
@@ -477,8 +463,8 @@ export function SnippetsPanel({
         await queryClient.invalidateQueries({
           queryKey: ["states", workspaceId],
         });
-      } catch (err) {
-        console.error("Failed to close terminal on delete:", err);
+      } catch {
+        // Disappeared terminal is ignored
       }
     }
 
@@ -551,10 +537,18 @@ export function SnippetsPanel({
         </Pressable>
       </View>
 
-      {!workspace ? (
+      {workspaceUnavailable ? (
         <View style={styles.stateBanner}>
           <Text style={styles.stateBannerText}>
             Workspace is not available on this host
+          </Text>
+        </View>
+      ) : null}
+
+      {terminalsUnsupported ? (
+        <View style={styles.stateBanner}>
+          <Text style={styles.stateBannerText}>
+            Update the Paseo daemon to run snippets
           </Text>
         </View>
       ) : null}
@@ -623,6 +617,7 @@ export function SnippetsPanel({
             onToggleShowScripts={handleToggleShowScripts}
             openTerminals={openTerminals}
             pendingActionEntries={pendingActions}
+            actionsDisabled={actionsDisabled}
             lastRunKey={lastRunKey}
             theme={theme}
             compact={layout.compact}
@@ -636,6 +631,7 @@ export function SnippetsPanel({
             snippets={allSnippets}
             openTerminals={openTerminals}
             pendingActionEntries={pendingActions}
+            actionsDisabled={actionsDisabled}
             lastRunSnippetId={lastRunSnippetId}
             theme={theme}
             compact={layout.compact}
