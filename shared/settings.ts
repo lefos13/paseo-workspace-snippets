@@ -24,3 +24,4 @@ export const snippetsSettings = defineSettings({
 
 export type SnippetsSettingsValues = z.infer<typeof snippetsSettings.schema>;
 export type SaveResult = Promise<boolean>;
+export type RevisionId = string;

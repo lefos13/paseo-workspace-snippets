@@ -4,7 +4,12 @@ import { Modal, ScrollView } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { snippetsFor } from "../../shared/entries";
-import type { SaveResult, Snippet } from "../../shared/settings";
+import type {
+  RevisionId,
+  SaveResult,
+  Snippet,
+  SnippetsSettingsValues,
+} from "../../shared/settings";
 import { snippetsSettings } from "../../shared/settings";
 import { SnippetEditor } from "./SnippetEditor";
 import { SnippetsSection } from "./SnippetsSection";
@@ -32,6 +37,10 @@ export function SnippetsPanel({
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
   const [initialConfirmDelete, setInitialConfirmDelete] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [capturedRevision, setCapturedRevision] =
+    useState<RevisionId | null>(null);
+  const [capturedValues, setCapturedValues] =
+    useState<SnippetsSettingsValues | null>(null);
 
   const headerTitle = workspace?.name
     ? `Snippets · ${workspace.name}`
@@ -46,95 +55,187 @@ export function SnippetsPanel({
   }, [settings, workspace?.projectRootPath, workspace?.directory]);
 
   const handleOpenAdd = () => {
+    if (settings.status !== "ready") return;
     setEditingSnippet(null);
     setInitialConfirmDelete(false);
+    setCapturedRevision(settings.revision);
+    setCapturedValues(settings.values);
     setEditorOpen(true);
   };
 
   const handleOpenEdit = (snippet: Snippet) => {
+    if (settings.status !== "ready") return;
     setEditingSnippet(snippet);
     setInitialConfirmDelete(false);
+    setCapturedRevision(settings.revision);
+    setCapturedValues(settings.values);
     setEditorOpen(true);
   };
 
   const handleOpenDelete = (snippet: Snippet) => {
+    if (settings.status !== "ready") return;
     setEditingSnippet(snippet);
     setInitialConfirmDelete(true);
+    setCapturedRevision(settings.revision);
+    setCapturedValues(settings.values);
     setEditorOpen(true);
   };
 
   const handleSaveSnippet = async (itemToSave: Snippet): SaveResult => {
-    if (settings.status !== "ready") return false;
+    if (settings.status !== "ready" || !capturedRevision || !capturedValues) {
+      return false;
+    }
 
     const projectKey = workspace?.projectRootPath;
     const workspaceKey = workspace?.directory;
 
-    const nextProjects = { ...settings.values.projects };
-    const nextWorkspaces = { ...settings.values.workspaces };
+    const nextProjects = { ...capturedValues.projects };
+    const nextWorkspaces = { ...capturedValues.workspaces };
 
     if (editingSnippet) {
-      if (projectKey && nextProjects[projectKey]) {
-        nextProjects[projectKey] = nextProjects[projectKey].filter(
-          (s) => s.id !== editingSnippet.id,
-        );
-      }
-      if (workspaceKey && nextWorkspaces[workspaceKey]) {
-        nextWorkspaces[workspaceKey] = nextWorkspaces[workspaceKey].filter(
-          (s) => s.id !== editingSnippet.id,
-        );
-      }
-    }
+      if (editingSnippet.scope === itemToSave.scope) {
+        if (
+          itemToSave.scope === "project" &&
+          projectKey &&
+          nextProjects[projectKey]
+        ) {
+          const list = [...nextProjects[projectKey]];
+          const idx = list.findIndex((s) => s.id === editingSnippet.id);
+          if (idx >= 0) {
+            list[idx] = itemToSave;
+            nextProjects[projectKey] = list;
+          } else {
+            nextProjects[projectKey] = [...list, itemToSave];
+          }
+        } else if (
+          itemToSave.scope === "workspace" &&
+          workspaceKey &&
+          nextWorkspaces[workspaceKey]
+        ) {
+          const list = [...nextWorkspaces[workspaceKey]];
+          const idx = list.findIndex((s) => s.id === editingSnippet.id);
+          if (idx >= 0) {
+            list[idx] = itemToSave;
+            nextWorkspaces[workspaceKey] = list;
+          } else {
+            nextWorkspaces[workspaceKey] = [...list, itemToSave];
+          }
+        }
+      } else {
+        // Scope changed: remove from old scope and drop key if empty
+        if (
+          editingSnippet.scope === "project" &&
+          projectKey &&
+          nextProjects[projectKey]
+        ) {
+          const filtered = nextProjects[projectKey].filter(
+            (s) => s.id !== editingSnippet.id,
+          );
+          if (filtered.length === 0) {
+            delete nextProjects[projectKey];
+          } else {
+            nextProjects[projectKey] = filtered;
+          }
+        } else if (
+          editingSnippet.scope === "workspace" &&
+          workspaceKey &&
+          nextWorkspaces[workspaceKey]
+        ) {
+          const filtered = nextWorkspaces[workspaceKey].filter(
+            (s) => s.id !== editingSnippet.id,
+          );
+          if (filtered.length === 0) {
+            delete nextWorkspaces[workspaceKey];
+          } else {
+            nextWorkspaces[workspaceKey] = filtered;
+          }
+        }
 
-    if (itemToSave.scope === "project") {
-      if (!projectKey) return false;
-      nextProjects[projectKey] = [
-        ...(nextProjects[projectKey] ?? []),
-        itemToSave,
-      ];
+        // Add to new scope
+        if (itemToSave.scope === "project") {
+          if (!projectKey) return false;
+          nextProjects[projectKey] = [
+            ...(nextProjects[projectKey] ?? []),
+            itemToSave,
+          ];
+        } else {
+          if (!workspaceKey) return false;
+          nextWorkspaces[workspaceKey] = [
+            ...(nextWorkspaces[workspaceKey] ?? []),
+            itemToSave,
+          ];
+        }
+      }
     } else {
-      if (!workspaceKey) return false;
-      nextWorkspaces[workspaceKey] = [
-        ...(nextWorkspaces[workspaceKey] ?? []),
-        itemToSave,
-      ];
+      // New snippet: append
+      if (itemToSave.scope === "project") {
+        if (!projectKey) return false;
+        nextProjects[projectKey] = [
+          ...(nextProjects[projectKey] ?? []),
+          itemToSave,
+        ];
+      } else {
+        if (!workspaceKey) return false;
+        nextWorkspaces[workspaceKey] = [
+          ...(nextWorkspaces[workspaceKey] ?? []),
+          itemToSave,
+        ];
+      }
     }
 
-    const nextValues = {
-      ...settings.values,
+    const nextValues: SnippetsSettingsValues = {
+      ...capturedValues,
       projects: nextProjects,
       workspaces: nextWorkspaces,
     };
 
-    return await settings.save(nextValues, settings.revision);
+    const success = await settings.save(nextValues, capturedRevision);
+    if (success && settings.status === "ready") {
+      setCapturedRevision(settings.revision);
+      setCapturedValues(settings.values);
+    }
+    return success;
   };
 
   const handleDeleteSnippet = async (snippet: Snippet): SaveResult => {
     if (settings.status !== "ready") return false;
+    const revision = capturedRevision ?? settings.revision;
+    const baseValues = capturedValues ?? settings.values;
 
     const projectKey = workspace?.projectRootPath;
     const workspaceKey = workspace?.directory;
 
-    const nextProjects = { ...settings.values.projects };
-    const nextWorkspaces = { ...settings.values.workspaces };
+    const nextProjects = { ...baseValues.projects };
+    const nextWorkspaces = { ...baseValues.workspaces };
 
     if (projectKey && nextProjects[projectKey]) {
-      nextProjects[projectKey] = nextProjects[projectKey].filter(
+      const filtered = nextProjects[projectKey].filter(
         (s) => s.id !== snippet.id,
       );
+      if (filtered.length === 0) {
+        delete nextProjects[projectKey];
+      } else {
+        nextProjects[projectKey] = filtered;
+      }
     }
     if (workspaceKey && nextWorkspaces[workspaceKey]) {
-      nextWorkspaces[workspaceKey] = nextWorkspaces[workspaceKey].filter(
+      const filtered = nextWorkspaces[workspaceKey].filter(
         (s) => s.id !== snippet.id,
       );
+      if (filtered.length === 0) {
+        delete nextWorkspaces[workspaceKey];
+      } else {
+        nextWorkspaces[workspaceKey] = filtered;
+      }
     }
 
-    const nextValues = {
-      ...settings.values,
+    const nextValues: SnippetsSettingsValues = {
+      ...baseValues,
       projects: nextProjects,
       workspaces: nextWorkspaces,
     };
 
-    return await settings.save(nextValues, settings.revision);
+    return await settings.save(nextValues, revision);
   };
 
   const handleConfirmReset = async () => {
