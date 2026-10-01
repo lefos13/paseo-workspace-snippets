@@ -114,3 +114,37 @@ export async function closeTerminalEntry(
     }
   });
 }
+
+export async function getTerminalOutput(
+  paseo: PaseoApi,
+  workspaceId: string,
+  terminalName: string,
+  lines: number,
+): Promise<{ open: boolean; lines: string[]; totalLines: number }> {
+  const ws = paseo.workspaces.ref(workspaceId);
+  const { entries } = await ws.terminals.list();
+  const existing = entries.find((t) => t.name === terminalName);
+
+  if (!existing) {
+    return { open: false, lines: [], totalLines: 0 };
+  }
+
+  try {
+    const handle = paseo.terminals.ref(existing.id);
+    const result = await handle.capture({ start: -lines, stripAnsi: true });
+    const outputLines = result.lines ?? [];
+    let endIdx = outputLines.length;
+    while (endIdx > 0 && outputLines[endIdx - 1].trim() === "") {
+      endIdx--;
+    }
+    const trimmedLines = outputLines.slice(0, endIdx);
+    return {
+      open: true,
+      lines: trimmedLines,
+      totalLines: result.totalLines ?? trimmedLines.length,
+    };
+  } catch (err) {
+    console.error("Failed to capture terminal output:", err);
+    return { open: false, lines: [], totalLines: 0 };
+  }
+}

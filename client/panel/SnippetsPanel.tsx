@@ -472,6 +472,7 @@ export function SnippetsPanel({
 
       {settings.status === "ready" ? (
         <SnippetsSection
+          workspaceId={workspaceId}
           snippets={allSnippets}
           openTerminals={openTerminals}
           pendingActionEntries={pendingActions}

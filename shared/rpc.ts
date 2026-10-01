@@ -41,3 +41,15 @@ export const closeEntryRpc = defineRpc({
     closed: z.boolean(),
   }),
 });
+
+export const entryOutputRpc = defineRpc({
+  name: "entry.output",
+  input: EntryInput.extend({
+    lines: z.number().int().min(1).max(200).default(40),
+  }),
+  output: z.object({
+    open: z.boolean(),
+    lines: z.array(z.string()),
+    totalLines: z.number(),
+  }),
+});

@@ -150,6 +150,25 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
       color: theme.colors.foregroundMuted,
       marginTop: 4,
     },
+    chevronButton: {
+      padding: 4,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
+    outputContainer: {
+      marginTop: 8,
+      padding: 10,
+      borderRadius: 6,
+      backgroundColor: theme.colors.surface0,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    outputText: {
+      fontSize: 11,
+      lineHeight: 16,
+      fontFamily: "monospace",
+      color: theme.colors.foregroundMuted,
+    },
     // Action buttons
     actionButton: {
       flexDirection: "row" as const,

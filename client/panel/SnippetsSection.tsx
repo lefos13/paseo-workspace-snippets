@@ -8,6 +8,7 @@ import { EntryRow } from "./EntryRow";
 import { makeStyles } from "./styles";
 
 export interface SnippetsSectionProps {
+  workspaceId: string;
   snippets: Snippet[];
   openTerminals: Record<string, string>;
   pendingActionEntries: Record<string, boolean>;
@@ -24,6 +25,7 @@ export interface SnippetsSectionProps {
 }
 
 export function SnippetsSection({
+  workspaceId,
   snippets,
   openTerminals,
   pendingActionEntries,
@@ -73,6 +75,7 @@ export function SnippetsSection({
             return (
               <EntryRow
                 key={snippet.id}
+                workspaceId={workspaceId}
                 snippet={snippet}
                 theme={theme}
                 compact={compact}

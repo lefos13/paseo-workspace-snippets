@@ -2,6 +2,7 @@ import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { resolveEntry } from "./server/entries";
 import {
   closeTerminalEntry,
+  getTerminalOutput,
   listTerminalStates,
   runTerminalEntry,
   stopTerminalEntry,
@@ -9,6 +10,7 @@ import {
 import { resolveWorkspace } from "./server/workspace";
 import {
   closeEntryRpc,
+  entryOutputRpc,
   runEntryRpc,
   stopEntryRpc,
   terminalStatesRpc,
@@ -66,6 +68,25 @@ export default function contribute(server: PluginServerContext) {
       throw err;
     }
   });
+
+  server.handle(
+    entryOutputRpc,
+    async ({ workspaceId, entryKey, lines }, { paseo }) => {
+      try {
+        const ws = await resolveWorkspace(paseo, workspaceId);
+        const entry = await resolveEntry(settings, entryKey, ws);
+        return await getTerminalOutput(
+          paseo,
+          workspaceId,
+          entry.terminalName,
+          lines,
+        );
+      } catch (err) {
+        console.error("[snippets] entryOutputRpc error:", err);
+        throw err;
+      }
+    },
+  );
 
   return () => {};
 }
