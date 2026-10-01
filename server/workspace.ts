@@ -1,4 +1,6 @@
-import type { PaseoApi } from "@getpaseo/client";
+import type { PluginHandlerContext } from "@getpaseo/plugin/server";
+
+export type Paseo = PluginHandlerContext["paseo"];
 
 export interface ResolvedWorkspace {
   directory: string;
@@ -6,7 +8,7 @@ export interface ResolvedWorkspace {
 }
 
 export async function resolveWorkspace(
-  paseo: PaseoApi,
+  paseo: Paseo,
   workspaceId: string,
 ): Promise<ResolvedWorkspace> {
   const handle = paseo.workspaces.ref(workspaceId);

@@ -1,4 +1,4 @@
-import type { PaseoApi } from "@getpaseo/client";
+import type { Paseo } from "./workspace";
 
 const locks = new Map<string, Promise<unknown>>();
 
@@ -20,7 +20,7 @@ function withTerminalLock<T>(
 }
 
 export async function listTerminalStates(
-  paseo: PaseoApi,
+  paseo: Paseo,
   workspaceId: string,
 ): Promise<Record<string, string>> {
   const ws = paseo.workspaces.ref(workspaceId);
@@ -35,7 +35,7 @@ export async function listTerminalStates(
 }
 
 export async function runTerminalEntry(
-  paseo: PaseoApi,
+  paseo: Paseo,
   workspaceId: string,
   directory: string,
   terminalName: string,
@@ -71,7 +71,7 @@ export async function runTerminalEntry(
 }
 
 export async function stopTerminalEntry(
-  paseo: PaseoApi,
+  paseo: Paseo,
   workspaceId: string,
   terminalName: string,
 ): Promise<{ stopped: boolean }> {
@@ -92,7 +92,7 @@ export async function stopTerminalEntry(
 }
 
 export async function closeTerminalEntry(
-  paseo: PaseoApi,
+  paseo: Paseo,
   workspaceId: string,
   terminalName: string,
 ): Promise<{ closed: boolean }> {
@@ -116,7 +116,7 @@ export async function closeTerminalEntry(
 }
 
 export async function getTerminalOutput(
-  paseo: PaseoApi,
+  paseo: Paseo,
   workspaceId: string,
   terminalName: string,
   lines: number,
