@@ -32,10 +32,13 @@ export async function findLocalWorkspace(
   const normalizedRoot = projectRootPath.replace(/[/\\]+$/, "");
   for (const ws of entries) {
     if (ws.archivingAt) continue;
+    // Older daemons may omit workspaceDirectory; only a local checkout or plain
+    // directory workspace can then be assumed to sit at the project root.
     const rawDir =
       ws.workspaceDirectory ??
-      (ws as { directory?: string }).directory ??
-      ws.projectRootPath;
+      (ws.workspaceKind === "local_checkout" || ws.workspaceKind === "directory"
+        ? ws.projectRootPath
+        : undefined);
     const normalizedDir = rawDir ? rawDir.replace(/[/\\]+$/, "") : "";
     if (normalizedDir === normalizedRoot) {
       return ws.id;
