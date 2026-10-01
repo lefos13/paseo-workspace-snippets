@@ -28,13 +28,8 @@ import { ScriptsSection } from "../panel/ScriptsSection";
 import { SnippetEditor } from "../panel/SnippetEditor";
 import { SnippetsSection } from "../panel/SnippetsSection";
 import { makeStyles } from "../panel/styles";
-
-interface ProjectDescriptor {
-  projectId: string;
-  projectDisplayName: string;
-  projectRootPath: string;
-  projectKind?: string;
-}
+import { ProjectList, shortenPath } from "./ProjectList";
+import type { ProjectDescriptor } from "./ProjectList";
 
 export function SnippetsHome({
   theme,
@@ -65,17 +60,28 @@ export function SnippetsHome({
     [projectsData],
   );
 
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) =>
+      a.projectDisplayName.localeCompare(b.projectDisplayName, undefined, {
+        sensitivity: "base",
+      }),
+    );
+  }, [projects]);
+
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null,
   );
+  const [projectModalOpen, setProjectModalOpen] = useState(false);
 
   const selectedProject = useMemo(() => {
     if (selectedProjectId) {
-      const match = projects.find((p) => p.projectId === selectedProjectId);
+      const match = sortedProjects.find(
+        (p) => p.projectId === selectedProjectId,
+      );
       if (match) return match;
     }
-    return projects[0] ?? null;
-  }, [projects, selectedProjectId]);
+    return sortedProjects[0] ?? null;
+  }, [sortedProjects, selectedProjectId]);
 
   const projectId = selectedProject?.projectId;
   const projectRootPath = selectedProject?.projectRootPath;
@@ -412,99 +418,34 @@ export function SnippetsHome({
       ? lastRunKey.slice("snippet:".length)
       : null;
 
-  return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Snippets</Text>
-        {selectedProject ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Refresh snippets for ${selectedProject.projectDisplayName}`}
-            style={styles.buttonSecondary}
-            onPress={handleRefresh}
-          >
-            <Icon name="RotateCw" size={14} color={theme.colors.foreground} />
-            <Text style={styles.buttonSecondaryText}>Refresh</Text>
-          </Pressable>
-        ) : null}
-      </View>
-
-      {projectsLoading ? (
-        <View style={styles.stateBanner}>
-          <Text style={styles.stateBannerTitle}>Loading projects...</Text>
-          <Text style={styles.stateBannerText}>
-            Fetching projects from Paseo
-          </Text>
-        </View>
-      ) : null}
-
-      {projectsError ? (
-        <View style={styles.stateBannerError}>
-          <Text style={styles.stateBannerTitle}>Failed to load projects</Text>
-          <Text style={styles.stateBannerTextDanger}>
-            {mapErrorMessage(projectsError)}
-          </Text>
-        </View>
-      ) : null}
-
-      {!projectsLoading && projects.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>
-            Add a project in Paseo first
-          </Text>
-        </View>
-      ) : null}
-
-      {projects.length > 0 ? (
-        <View style={styles.projectPickerSection}>
-          <Text style={styles.projectPickerLabel}>Projects</Text>
-          <View
-            style={
-              layout.compact
-                ? styles.projectPickerList
-                : styles.projectPickerWrap
-            }
-          >
-            {projects.map((project) => {
-              const isSelected =
-                project.projectId === selectedProject?.projectId;
-              return (
-                <Pressable
-                  key={project.projectId}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select project ${project.projectDisplayName}`}
-                  style={[
-                    styles.projectChip,
-                    isSelected && styles.projectChipSelected,
-                  ]}
-                  onPress={() => setSelectedProjectId(project.projectId)}
-                >
-                  <Text
-                    style={
-                      isSelected
-                        ? styles.projectChipNameSelected
-                        : styles.projectChipName
-                    }
-                    numberOfLines={1}
-                  >
-                    {project.projectDisplayName}
-                  </Text>
-                  <Text
-                    style={styles.projectChipPath}
-                    numberOfLines={1}
-                    ellipsizeMode="middle"
-                  >
-                    {project.projectRootPath}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      ) : null}
-
+  const content = (
+    <>
       {selectedProject ? (
         <>
+          <View style={styles.projectHeaderRow}>
+            <View style={styles.projectHeaderInfo}>
+              <Text style={styles.projectHeaderTitle} numberOfLines={1}>
+                {selectedProject.projectDisplayName}
+              </Text>
+              <Text
+                style={styles.projectHeaderPath}
+                numberOfLines={1}
+                ellipsizeMode="middle"
+              >
+                {shortenPath(selectedProject.projectRootPath)}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Refresh snippets for ${selectedProject.projectDisplayName}`}
+              style={styles.buttonSecondary}
+              onPress={handleRefresh}
+            >
+              <Icon name="RotateCw" size={14} color={theme.colors.foreground} />
+              <Text style={styles.buttonSecondaryText}>Refresh</Text>
+            </Pressable>
+          </View>
+
           {projectUnavailable ? (
             <View style={styles.stateBannerError}>
               <Text style={styles.stateBannerTextDanger}>
@@ -620,56 +561,195 @@ export function SnippetsHome({
               />
             </>
           ) : null}
-
-          <SnippetEditor
-            open={editorOpen}
-            onOpenChange={setEditorOpen}
-            snippet={editingSnippet}
-            allSnippets={projectSnippets}
-            hasProjectRoot={true}
-            lockedScope="project"
-            isTerminalOpen={isEditingSnippetTerminalOpen}
-            theme={theme}
-            compact={layout.compact}
-            saving={settings.saving}
-            saveError={settings.saveError}
-            onSave={handleSaveSnippet}
-            onDelete={handleDeleteSnippet}
-            initialConfirmDelete={initialConfirmDelete}
-          />
-
-          <Modal
-            title="Reset snippets?"
-            open={showResetConfirm}
-            onOpenChange={setShowResetConfirm}
-          >
-            <Modal.Content style={styles.formContainer}>
-              <Text style={styles.stateBannerText}>
-                Are you sure you want to reset your snippets settings? This will
-                revert settings to defaults and discard any invalid configuration.
-              </Text>
-              <View style={styles.modalActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Cancel reset snippets for ${selectedProject.projectDisplayName}`}
-                  style={styles.buttonSecondary}
-                  onPress={() => setShowResetConfirm(false)}
-                >
-                  <Text style={styles.buttonSecondaryText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Confirm reset snippets for ${selectedProject.projectDisplayName}`}
-                  style={styles.buttonDangerSolid}
-                  onPress={handleConfirmReset}
-                >
-                  <Text style={styles.buttonDangerSolidText}>Reset snippets</Text>
-                </Pressable>
-              </View>
-            </Modal.Content>
-          </Modal>
         </>
-      ) : null}
-    </ScrollView>
+      ) : (
+        <>
+          {projectsLoading ? (
+            <View style={styles.stateBanner}>
+              <Text style={styles.stateBannerTitle}>Loading projects...</Text>
+              <Text style={styles.stateBannerText}>
+                Fetching projects from Paseo
+              </Text>
+            </View>
+          ) : null}
+
+          {projectsError ? (
+            <View style={styles.stateBannerError}>
+              <Text style={styles.stateBannerTitle}>
+                Failed to load projects
+              </Text>
+              <Text style={styles.stateBannerTextDanger}>
+                {mapErrorMessage(projectsError)}
+              </Text>
+            </View>
+          ) : null}
+
+          {!projectsLoading && !projectsError ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                {projects.length === 0
+                  ? "Add a project in Paseo first"
+                  : "No project selected"}
+              </Text>
+            </View>
+          ) : null}
+        </>
+      )}
+    </>
+  );
+
+  const modals = (
+    <>
+      <SnippetEditor
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        snippet={editingSnippet}
+        allSnippets={projectSnippets}
+        hasProjectRoot={true}
+        lockedScope="project"
+        isTerminalOpen={isEditingSnippetTerminalOpen}
+        theme={theme}
+        compact={layout.compact}
+        saving={settings.saving}
+        saveError={settings.saveError}
+        onSave={handleSaveSnippet}
+        onDelete={handleDeleteSnippet}
+        initialConfirmDelete={initialConfirmDelete}
+      />
+
+      <Modal
+        title="Reset snippets?"
+        open={showResetConfirm}
+        onOpenChange={setShowResetConfirm}
+      >
+        <Modal.Content style={styles.formContainer}>
+          <Text style={styles.stateBannerText}>
+            Are you sure you want to reset your snippets settings? This will
+            revert settings to defaults and discard any invalid configuration.
+          </Text>
+          <View style={styles.modalActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                selectedProject
+                  ? `Cancel reset snippets for ${selectedProject.projectDisplayName}`
+                  : "Cancel reset snippets"
+              }
+              style={styles.buttonSecondary}
+              onPress={() => setShowResetConfirm(false)}
+            >
+              <Text style={styles.buttonSecondaryText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                selectedProject
+                  ? `Confirm reset snippets for ${selectedProject.projectDisplayName}`
+                  : "Confirm reset snippets"
+              }
+              style={styles.buttonDangerSolid}
+              onPress={handleConfirmReset}
+            >
+              <Text style={styles.buttonDangerSolidText}>Reset snippets</Text>
+            </Pressable>
+          </View>
+        </Modal.Content>
+      </Modal>
+    </>
+  );
+
+  if (layout.compact) {
+    return (
+      <View style={styles.compactRoot}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            selectedProject
+              ? `Select project, currently ${selectedProject.projectDisplayName}`
+              : "Select project"
+          }
+          style={({ pressed }) => [
+            styles.compactSelectorRow,
+            pressed && styles.compactSelectorRowPressed,
+          ]}
+          onPress={() => setProjectModalOpen(true)}
+        >
+          <View style={styles.compactSelectorInfo}>
+            <Text style={styles.compactSelectorName} numberOfLines={1}>
+              {selectedProject?.projectDisplayName ??
+                (projectsLoading ? "Loading projects..." : "Select project")}
+            </Text>
+            {selectedProject ? (
+              <Text
+                style={styles.compactSelectorPath}
+                numberOfLines={1}
+                ellipsizeMode="middle"
+              >
+                {shortenPath(selectedProject.projectRootPath)}
+              </Text>
+            ) : null}
+          </View>
+          <Icon
+            name="ChevronsUpDown"
+            size={16}
+            color={theme.colors.foregroundMuted}
+          />
+        </Pressable>
+
+        <ScrollView
+          style={styles.compactScroll}
+          contentContainerStyle={styles.compactScrollContent}
+        >
+          {content}
+        </ScrollView>
+
+        <Modal
+          title="Projects"
+          open={projectModalOpen}
+          onOpenChange={setProjectModalOpen}
+        >
+          <Modal.Content style={styles.formContainer}>
+            <ProjectList
+              projects={sortedProjects}
+              selectedId={selectedProject?.projectId ?? null}
+              onSelect={(id) => {
+                setSelectedProjectId(id);
+                setProjectModalOpen(false);
+              }}
+              theme={theme}
+              compact={true}
+            />
+          </Modal.Content>
+        </Modal>
+
+        {modals}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.wideRoot}>
+      <ScrollView
+        style={styles.leftColumn}
+        contentContainerStyle={styles.leftColumnContent}
+      >
+        <ProjectList
+          projects={sortedProjects}
+          selectedId={selectedProject?.projectId ?? null}
+          onSelect={(id) => setSelectedProjectId(id)}
+          theme={theme}
+          compact={false}
+        />
+      </ScrollView>
+
+      <ScrollView
+        style={styles.rightColumn}
+        contentContainerStyle={styles.rightColumnContent}
+      >
+        {content}
+      </ScrollView>
+
+      {modals}
+    </View>
   );
 }

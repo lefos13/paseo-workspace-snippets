@@ -51,14 +51,15 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
       color: theme.colors.foregroundMuted,
     },
     list: {
-      gap: 8,
+      gap: 6,
     },
     // Desktop row
     row: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "space-between" as const,
-      padding: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
       borderRadius: 6,
       backgroundColor: theme.colors.surface1,
       borderWidth: 1,
@@ -81,7 +82,8 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
     },
     // Compact row
     compactRow: {
-      padding: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
       borderRadius: 6,
       backgroundColor: theme.colors.surface1,
       borderWidth: 1,
@@ -405,51 +407,89 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
       gap: 8,
       marginTop: 4,
     },
-    // Project picker styles
-    projectPickerSection: {
-      gap: 8,
-    },
-    projectPickerLabel: {
-      fontSize: 12,
-      fontWeight: "600" as const,
-      color: theme.colors.foregroundMuted,
-      textTransform: "uppercase" as const,
-      letterSpacing: 0.5,
-    },
-    projectPickerWrap: {
+    // Layout styles
+    wideRoot: {
+      flex: 1,
       flexDirection: "row" as const,
-      flexWrap: "wrap" as const,
-      gap: 8,
+      backgroundColor: theme.colors.surface0,
     },
-    projectPickerList: {
-      flexDirection: "column" as const,
-      gap: 8,
+    leftColumn: {
+      width: 260,
+      flexGrow: 0,
+      flexShrink: 0,
+      borderRightWidth: 1,
+      borderRightColor: theme.colors.border,
+      backgroundColor: theme.colors.surface0,
     },
-    projectChip: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 6,
+    leftColumnContent: {
+      padding: 12,
+    },
+    rightColumn: {
+      flex: 1,
+      backgroundColor: theme.colors.surface0,
+    },
+    rightColumnContent: {
+      padding: 24,
+      gap: 16,
+    },
+    compactRoot: {
+      flex: 1,
+      backgroundColor: theme.colors.surface0,
+    },
+    compactSelectorRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
       backgroundColor: theme.colors.surface1,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      gap: 12,
+    },
+    compactSelectorRowPressed: {
+      backgroundColor: theme.colors.surface2,
+    },
+    compactSelectorInfo: {
+      flex: 1,
       gap: 2,
     },
-    projectChipSelected: {
-      backgroundColor: theme.colors.surface2,
-      borderColor: theme.colors.accent,
-    },
-    projectChipName: {
-      fontSize: 13,
-      fontWeight: "500" as const,
-      color: theme.colors.foreground,
-    },
-    projectChipNameSelected: {
-      fontSize: 13,
+    compactSelectorName: {
+      fontSize: 14,
       fontWeight: "600" as const,
       color: theme.colors.foreground,
     },
-    projectChipPath: {
+    compactSelectorPath: {
       fontSize: 11,
+      color: theme.colors.foregroundMuted,
+    },
+    compactScroll: {
+      flex: 1,
+    },
+    compactScrollContent: {
+      padding: 16,
+      gap: 16,
+    },
+    projectHeaderRow: {
+      flexDirection: "row" as const,
+      justifyContent: "space-between" as const,
+      alignItems: "center" as const,
+      gap: 12,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    projectHeaderInfo: {
+      flex: 1,
+      gap: 2,
+    },
+    projectHeaderTitle: {
+      fontSize: 18,
+      fontWeight: "600" as const,
+      color: theme.colors.foreground,
+    },
+    projectHeaderPath: {
+      fontSize: 12,
       color: theme.colors.foregroundMuted,
     },
   };
