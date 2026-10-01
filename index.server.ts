@@ -1,5 +1,6 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { resolveEntry } from "./server/entries";
+import { detectScripts } from "./server/package-json";
 import {
   closeTerminalEntry,
   getTerminalOutput,
@@ -10,6 +11,7 @@ import {
 import { resolveWorkspace } from "./server/workspace";
 import {
   closeEntryRpc,
+  detectScriptsRpc,
   entryOutputRpc,
   runEntryRpc,
   stopEntryRpc,
@@ -19,6 +21,16 @@ import { snippetsSettings } from "./shared/settings";
 
 export default function contribute(server: PluginServerContext) {
   const settings = server.registerSettings(snippetsSettings);
+
+  server.handle(detectScriptsRpc, async ({ workspaceId }, { paseo }) => {
+    try {
+      const ws = await resolveWorkspace(paseo, workspaceId);
+      return await detectScripts(ws.directory);
+    } catch (err) {
+      console.error("[snippets] detectScriptsRpc error:", err);
+      throw err;
+    }
+  });
 
   server.handle(terminalStatesRpc, async ({ workspaceId }, { paseo }) => {
     try {

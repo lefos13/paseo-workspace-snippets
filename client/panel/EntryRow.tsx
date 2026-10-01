@@ -2,30 +2,36 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { entryKey } from "../../shared/entries";
-import type { Snippet } from "../../shared/settings";
 import { OutputPreview } from "./OutputPreview";
 import { makeStyles } from "./styles";
 
 export interface EntryRowProps {
   workspaceId: string;
-  snippet: Snippet;
+  name: string;
+  command: string;
+  scope?: "project" | "workspace";
+  entryKey: string;
+  terminalName: string;
   theme: PluginTheme;
   compact: boolean;
   isOpen: boolean;
   isActionPending: boolean;
   showTabHint: boolean;
-  onRun: (snippet: Snippet) => void;
-  onRestart: (snippet: Snippet) => void;
-  onStop: (snippet: Snippet) => void;
-  onClose: (snippet: Snippet) => void;
-  onEdit: (snippet: Snippet) => void;
-  onDelete: (snippet: Snippet) => void;
+  onRun: () => void;
+  onRestart: () => void;
+  onStop: () => void;
+  onClose: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 export function EntryRow({
   workspaceId,
-  snippet,
+  name,
+  command,
+  scope,
+  entryKey,
+  terminalName,
   theme,
   compact,
   isOpen,
@@ -51,7 +57,7 @@ export function EntryRow({
   const chevronButton = (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Toggle output preview for ${snippet.name}`}
+      accessibilityLabel={`Toggle output preview for ${name}`}
       style={styles.chevronButton}
       onPress={() => setExpanded((prev) => !prev)}
     >
@@ -69,13 +75,13 @@ export function EntryRow({
         <>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Restart snippet ${snippet.name}`}
+            accessibilityLabel={`Restart ${name}`}
             style={[
               styles.actionButton,
               isActionPending && styles.actionButtonDisabled,
             ]}
             disabled={isActionPending}
-            onPress={() => onRestart(snippet)}
+            onPress={onRestart}
           >
             <Icon name="RotateCw" size={14} color={theme.colors.foreground} />
             <Text style={styles.actionButtonText}>Restart</Text>
@@ -83,13 +89,13 @@ export function EntryRow({
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Stop snippet ${snippet.name}`}
+            accessibilityLabel={`Stop ${name}`}
             style={[
               styles.actionButton,
               isActionPending && styles.actionButtonDisabled,
             ]}
             disabled={isActionPending}
-            onPress={() => onStop(snippet)}
+            onPress={onStop}
           >
             <Icon name="Square" size={14} color={theme.colors.foreground} />
             <Text style={styles.actionButtonText}>Stop</Text>
@@ -97,13 +103,13 @@ export function EntryRow({
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Close snippet ${snippet.name}`}
+            accessibilityLabel={`Close ${name}`}
             style={[
               styles.actionButton,
               isActionPending && styles.actionButtonDisabled,
             ]}
             disabled={isActionPending}
-            onPress={() => onClose(snippet)}
+            onPress={onClose}
           >
             <Icon name="X" size={14} color={theme.colors.foreground} />
             <Text style={styles.actionButtonText}>Close</Text>
@@ -112,38 +118,42 @@ export function EntryRow({
       ) : (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Run snippet ${snippet.name}`}
+          accessibilityLabel={`Run ${name}`}
           style={[
             styles.actionButton,
             isActionPending && styles.actionButtonDisabled,
           ]}
           disabled={isActionPending}
-          onPress={() => onRun(snippet)}
+          onPress={onRun}
         >
           <Icon name="Play" size={14} color={theme.colors.foreground} />
           <Text style={styles.actionButtonText}>Run</Text>
         </Pressable>
       )}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Edit snippet ${snippet.name}`}
-        style={styles.actionButton}
-        onPress={() => onEdit(snippet)}
-      >
-        <Icon name="Pencil" size={14} color={theme.colors.foreground} />
-        <Text style={styles.actionButtonText}>Edit</Text>
-      </Pressable>
+      {onEdit ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Edit snippet ${name}`}
+          style={styles.actionButton}
+          onPress={onEdit}
+        >
+          <Icon name="Pencil" size={14} color={theme.colors.foreground} />
+          <Text style={styles.actionButtonText}>Edit</Text>
+        </Pressable>
+      ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Delete snippet ${snippet.name}`}
-        style={styles.actionDangerButton}
-        onPress={() => onDelete(snippet)}
-      >
-        <Icon name="Trash2" size={14} color={theme.colors.statusDanger} />
-        <Text style={styles.actionDangerButtonText}>Delete</Text>
-      </Pressable>
+      {onDelete ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Delete snippet ${name}`}
+          style={styles.actionDangerButton}
+          onPress={onDelete}
+        >
+          <Icon name="Trash2" size={14} color={theme.colors.statusDanger} />
+          <Text style={styles.actionDangerButtonText}>Delete</Text>
+        </Pressable>
+      ) : null}
 
       {chevronButton}
     </View>
@@ -151,19 +161,25 @@ export function EntryRow({
 
   const tabHint = showTabHint ? (
     <Text style={styles.tabHintText}>
-      Opened in terminal tab snippet:{snippet.name}
+      Opened in terminal tab {terminalName}
     </Text>
   ) : null;
 
   const outputPreview = expanded ? (
     <OutputPreview
       workspaceId={workspaceId}
-      entryKey={entryKey("snippet", snippet.id)}
-      entryName={snippet.name}
+      entryKey={entryKey}
+      entryName={name}
       isOpen={isOpen}
       theme={theme}
       compact={compact}
     />
+  ) : null;
+
+  const scopeBadge = scope ? (
+    <View style={styles.scopeBadge}>
+      <Text style={styles.scopeBadgeText}>{scope}</Text>
+    </View>
   ) : null;
 
   if (compact) {
@@ -171,12 +187,10 @@ export function EntryRow({
       <View style={styles.compactRow}>
         <View style={styles.compactRowHeader}>
           <Text style={styles.entryName} numberOfLines={1}>
-            {snippet.name}
+            {name}
           </Text>
           <View style={styles.rowTrailing}>
-            <View style={styles.scopeBadge}>
-              <Text style={styles.scopeBadgeText}>{snippet.scope}</Text>
-            </View>
+            {scopeBadge}
             {statusIndicator}
           </View>
         </View>
@@ -186,7 +200,7 @@ export function EntryRow({
           numberOfLines={1}
           ellipsizeMode="tail"
         >
-          {snippet.command}
+          {command}
         </Text>
 
         {tabHint}
@@ -203,22 +217,20 @@ export function EntryRow({
       <View style={styles.row}>
         <View style={styles.rowMain}>
           <Text style={styles.entryName} numberOfLines={1}>
-            {snippet.name}
+            {name}
           </Text>
           <Text
             style={styles.entryCommand}
             numberOfLines={1}
             ellipsizeMode="tail"
           >
-            {snippet.command}
+            {command}
           </Text>
           {tabHint}
         </View>
 
         <View style={styles.rowTrailing}>
-          <View style={styles.scopeBadge}>
-            <Text style={styles.scopeBadgeText}>{snippet.scope}</Text>
-          </View>
+          {scopeBadge}
           {statusIndicator}
           {actionButtons}
         </View>

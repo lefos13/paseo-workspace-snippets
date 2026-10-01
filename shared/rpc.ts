@@ -9,6 +9,23 @@ export const EntryInput = WorkspaceInput.extend({
   entryKey: z.string().regex(/^(script|snippet):.+$/),
 });
 
+export const detectScriptsRpc = defineRpc({
+  name: "scripts.detect",
+  input: WorkspaceInput,
+  output: z.object({
+    status: z.enum(["ok", "missing", "invalid"]),
+    error: z.string().nullable(),
+    packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]),
+    scripts: z.array(
+      z.object({
+        name: z.string(),
+        body: z.string(),
+        command: z.string(),
+      }),
+    ),
+  }),
+});
+
 export const terminalStatesRpc = defineRpc({
   name: "terminals.states",
   input: WorkspaceInput,

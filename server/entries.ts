@@ -1,6 +1,7 @@
 import type { PluginSettings } from "@getpaseo/plugin/server";
 import { snippetsFor, terminalName } from "../shared/entries";
 import type { snippetsSettings } from "../shared/settings";
+import { detectScripts } from "./package-json";
 import type { ResolvedWorkspace } from "./workspace";
 
 export interface ResolvedEntry {
@@ -39,8 +40,27 @@ export async function resolveEntry(
   }
 
   if (entryKey.startsWith("script:")) {
-    // Task 6 will implement package.json script detection and resolution
-    throw new Error(`ENTRY_NOT_FOUND: Script entries are not supported yet`);
+    const scriptName = entryKey.slice("script:".length);
+    const detection = await detectScripts(paths.directory);
+    if (detection.status !== "ok") {
+      throw new Error(
+        `ENTRY_NOT_FOUND: Cannot resolve script "${scriptName}": package.json is ${detection.status}`,
+      );
+    }
+
+    const found = detection.scripts.find((s) => s.name === scriptName);
+    if (!found) {
+      throw new Error(
+        `ENTRY_NOT_FOUND: Script "${scriptName}" not found in package.json`,
+      );
+    }
+
+    return {
+      key: entryKey,
+      label: found.name,
+      command: found.command,
+      terminalName: terminalName("script", found.name),
+    };
   }
 
   throw new Error(`ENTRY_NOT_FOUND: Invalid entry key ${entryKey}`);

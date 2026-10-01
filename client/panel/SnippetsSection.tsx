@@ -2,7 +2,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
-import { terminalName } from "../../shared/entries";
+import { entryKey, terminalName } from "../../shared/entries";
 import type { Snippet } from "../../shared/settings";
 import { EntryRow } from "./EntryRow";
 import { makeStyles } from "./styles";
@@ -76,18 +76,22 @@ export function SnippetsSection({
               <EntryRow
                 key={snippet.id}
                 workspaceId={workspaceId}
-                snippet={snippet}
+                name={snippet.name}
+                command={snippet.command}
+                scope={snippet.scope}
+                entryKey={entryKey("snippet", snippet.id)}
+                terminalName={termName}
                 theme={theme}
                 compact={compact}
                 isOpen={isOpen}
                 isActionPending={isActionPending}
                 showTabHint={showTabHint}
-                onRun={onRun}
-                onRestart={onRestart}
-                onStop={onStop}
-                onClose={onClose}
-                onEdit={onEdit}
-                onDelete={onDelete}
+                onRun={() => onRun(snippet)}
+                onRestart={() => onRestart(snippet)}
+                onStop={() => onStop(snippet)}
+                onClose={() => onClose(snippet)}
+                onEdit={() => onEdit(snippet)}
+                onDelete={() => onDelete(snippet)}
               />
             );
           })}
