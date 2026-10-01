@@ -1,16 +1,15 @@
 {
   "name": "paseo-workspace-snippets",
-  "private": true,
   "version": "0.2.2",
   "files": [
     "paseo-plugin.json",
-    "index.client.ts",
     "index.client.tsx",
     "index.server.ts",
-    "index.server.tsx",
     "client/",
     "server/",
-    "shared/"
+    "shared/",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -23,5 +22,24 @@
     "react-native": "0.81.5",
     "typescript": "^5.9.3",
     "zod": "^4.4.3"
-  }
+  },
+  "license": "MIT",
+  "author": "lefos13",
+  "description": "Run saved command snippets and package.json scripts in Paseo workspace terminals, from a per-workspace panel, a sidebar screen, or /snippet.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lefos13/paseo-workspace-snippets.git"
+  },
+  "homepage": "https://github.com/lefos13/paseo-workspace-snippets#readme",
+  "bugs": {
+    "url": "https://github.com/lefos13/paseo-workspace-snippets/issues"
+  },
+  "keywords": [
+    "paseo",
+    "paseo-plugin",
+    "snippets",
+    "terminal",
+    "scripts",
+    "package.json"
+  ]
 }

@@ -9,6 +9,18 @@ A Paseo plugin for running command snippets and package.json scripts in workspac
 - **Terminal orchestration**: Creates and manages interactive workspace terminal tabs with Run, Restart, Stop, Close, and inline output peek.
 - **Quick access**: Command Center integration (⌘K "Open snippets") and `/snippet <name>` slash command.
 
+## Install
+
+Requires Paseo 0.10.2 or newer on both the daemon and the app, with **Settings → Plugins → Enable plugins** turned on.
+
+```bash
+paseo plugin install npm:paseo-workspace-snippets
+# or from GitHub
+paseo plugin install github:lefos13/paseo-workspace-snippets
+```
+
+You can also paste either source into **Settings → Plugins → Plugin source**. Then run `paseo plugin ls`: `paseo-workspace-snippets` should be `running`, and **Snippets** appears in the sidebar.
+
 ## Usage
 
 ### Sidebar → Snippets (No Workspace Open)
