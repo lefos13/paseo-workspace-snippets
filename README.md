@@ -14,7 +14,7 @@ Status: scaffold only (`paseo plugin init`, Paseo 0.10.2). The implementation pl
 | UI for each workspace | `client.addWorkspacePanel({ context: "workspace", locations: ["workspace", "explorer"] })` |
 | Workspace path | `useWorkspace(workspaceId, w => ({ directory, projectRootPath }))` |
 | Run in a terminal | `paseo.workspaces.ref(id).terminals.create({ name, cwd, command?, args? })` |
-| Re-run, stop, restart | `terminals.list()` and the handle's `write`, `sendKeys("C-c" \| "Enter")`, `kill()` |
+| Re-run, stop, restart | `terminals.list()` and the handle's `write`, `sendKeys(["C-c"])` / `sendKeys(["Enter"])`, `kill()` |
 | Output preview | `handle.capture({ start: -50 })` (polling only, no stream) |
 | Detect `package.json` | daemon-side RPC (`defineRpc` + `server.handle`) with `node:fs` |
 | Persist snippets | `defineSettings({ scope: "host" })`, keyed by project or directory |
