@@ -14,6 +14,7 @@ A Paseo plugin for running command snippets and package.json scripts in workspac
 ### Workspace Panel
 
 Open the Snippets panel through:
+- The `Snippets` button in the workspace header.
 - The `Snippets` tab in the workspace panel bar or explorer sidebar.
 - Command Center (⌘K) search for "Open snippets".
 - The `/snippet` slash command with no arguments.

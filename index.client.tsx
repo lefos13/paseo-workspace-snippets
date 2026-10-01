@@ -1,8 +1,11 @@
 import type { PluginClientContext } from "@getpaseo/plugin/client";
+import { registerHeaderButtons } from "./client/headerButtons";
 import { SnippetsPanel } from "./client/panel/SnippetsPanel";
 import { runByNameRpc } from "./shared/rpc";
 
 export default function contribute(client: PluginClientContext) {
+  const cleanupHeaderButtons = registerHeaderButtons(client);
+
   client.addWorkspacePanel({
     id: "snippets",
     title: "Snippets",
@@ -40,5 +43,7 @@ export default function contribute(client: PluginClientContext) {
     },
   });
 
-  return () => {};
+  return () => {
+    cleanupHeaderButtons();
+  };
 }

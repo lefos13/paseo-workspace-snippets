@@ -341,6 +341,10 @@ Snippets · <workspace name>                       [↻ Refresh]
   - Without args: `openPanel("snippets")`.
   - Before Task 4, check that `snippet` does not collide with a built-in command (a collision
     silently drops the plugin command); fall back to `run-snippet`.
+- Header button (added after v0.1.0 feedback): always-visible `open-snippets` button registered
+  on every workspace header via `client.addHeaderButton`, dynamically synced with
+  `client.paseo.workspaces.list({ subscribe: {} })`. Provides immediate panel access when starting
+  a new session in a workspace with no open tabs or composer chat.
 
 ## 7. Error states
 
