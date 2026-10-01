@@ -30,6 +30,7 @@ import { SnippetsSection } from "../panel/SnippetsSection";
 import { makeStyles } from "../panel/styles";
 import { ProjectList, shortenPath } from "./ProjectList";
 import type { ProjectDescriptor } from "./ProjectList";
+import { orderProjects } from "./projectOrder";
 
 export function SnippetsHome({
   theme,
@@ -60,13 +61,12 @@ export function SnippetsHome({
     [projectsData],
   );
 
+  const projectOrder =
+    settings.status === "ready" ? settings.values.projectOrder : undefined;
+
   const sortedProjects = useMemo(() => {
-    return [...projects].sort((a, b) =>
-      a.projectDisplayName.localeCompare(b.projectDisplayName, undefined, {
-        sensitivity: "base",
-      }),
-    );
-  }, [projects]);
+    return orderProjects(projects, projectOrder);
+  }, [projects, projectOrder]);
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null,

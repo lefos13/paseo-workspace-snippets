@@ -19,6 +19,7 @@ export const snippetsSettings = defineSettings({
     // key: workspace directory (scope "workspace")
     workspaces: z.record(z.string(), z.array(SnippetSchema)).default({}),
     showScripts: z.boolean().default(true),
+    projectOrder: z.array(z.string()).default([]),
   }),
 });
 

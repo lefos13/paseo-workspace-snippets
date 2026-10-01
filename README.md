@@ -15,7 +15,7 @@ A Paseo plugin for running command snippets and package.json scripts in workspac
 
 When starting a session or viewing the **New workspace** screen before any workspace is open, access snippets via the `Snippets` item in the Paseo application sidebar.
 
-- **Project picker**: Switch between any registered Paseo project using chips. Displays the project display name and repo root path.
+- **Project picker & reordering**: Switch between any registered Paseo project. Click the reorder button in the header to customize project order with move up/down/top controls or reset to A–Z, persisted in plugin settings.
 - **Scripts and project snippets**: Lists auto-detected `package.json` scripts and project-scoped snippets for the selected project. (Workspace-scoped snippets require an active workspace and are not shown).
 - **Local workspace orchestration**: Clicking **Run** opens (or reuses) the project's Local workspace (`directory === projectRootPath`), executes the command in a dedicated terminal tab (`script:<name>` or `snippet:<name>`), and navigates directly to that workspace.
 - **Lifecycle actions**: When a Local workspace is already active for the selected project, entries reflect live open status with **Restart**, **Stop**, **Close**, and terminal output peek.

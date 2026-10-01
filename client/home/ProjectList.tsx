@@ -1,7 +1,11 @@
 import type { PluginTheme } from "@getpaseo/plugin";
-import { TextInput } from "@getpaseo/plugin/client/react-native";
+import { useSettings } from "@getpaseo/plugin/client";
+import { Icon, TextInput } from "@getpaseo/plugin/client/react-native";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import type { SnippetsSettingsValues } from "../../shared/settings";
+import { snippetsSettings } from "../../shared/settings";
+import { orderProjects } from "./projectOrder";
 
 export interface ProjectDescriptor {
   projectId: string;
@@ -34,6 +38,9 @@ function makeProjectListStyles(theme: PluginTheme) {
       gap: 10,
     },
     header: {
+      flexDirection: "row" as const,
+      justifyContent: "space-between" as const,
+      alignItems: "center" as const,
       paddingBottom: 2,
     },
     headerTitle: {
@@ -42,6 +49,19 @@ function makeProjectListStyles(theme: PluginTheme) {
       color: theme.colors.foregroundMuted,
       textTransform: "uppercase" as const,
       letterSpacing: 0.5,
+    },
+    reorderButton: {
+      padding: 4,
+      borderRadius: 4,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      backgroundColor: "transparent",
+    },
+    reorderButtonActive: {
+      backgroundColor: theme.colors.surface2,
+    },
+    reorderButtonPressed: {
+      backgroundColor: theme.colors.surface1,
     },
     filterInput: {
       paddingHorizontal: 10,
@@ -57,13 +77,16 @@ function makeProjectListStyles(theme: PluginTheme) {
       gap: 4,
     },
     projectRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
       paddingVertical: 8,
       paddingHorizontal: 12,
       borderRadius: 6,
       borderLeftWidth: 3,
       borderLeftColor: "transparent",
       backgroundColor: "transparent",
-      gap: 2,
+      gap: 8,
     },
     projectRowSelected: {
       backgroundColor: theme.colors.surface2,
@@ -75,6 +98,22 @@ function makeProjectListStyles(theme: PluginTheme) {
     projectRowPressedSelected: {
       backgroundColor: theme.colors.surface2,
       opacity: 0.85,
+    },
+    projectRowEdit: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      borderLeftWidth: 3,
+      borderLeftColor: "transparent",
+      backgroundColor: theme.colors.surface1,
+      gap: 8,
+    },
+    projectInfo: {
+      flex: 1,
+      gap: 2,
     },
     projectName: {
       fontSize: 13,
@@ -90,6 +129,23 @@ function makeProjectListStyles(theme: PluginTheme) {
       fontSize: 11,
       color: theme.colors.foregroundMuted,
     },
+    rowActions: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 2,
+    },
+    iconButton: {
+      padding: 4,
+      borderRadius: 4,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+    },
+    iconButtonPressed: {
+      backgroundColor: theme.colors.surface2,
+    },
+    iconButtonDisabled: {
+      opacity: 0.35,
+    },
     emptyContainer: {
       paddingVertical: 16,
       paddingHorizontal: 8,
@@ -98,6 +154,67 @@ function makeProjectListStyles(theme: PluginTheme) {
     emptyText: {
       fontSize: 13,
       color: theme.colors.foregroundMuted,
+    },
+    footer: {
+      gap: 6,
+      marginTop: 4,
+    },
+    footerActions: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "space-between" as const,
+      flexWrap: "wrap" as const,
+      gap: 8,
+    },
+    footerRightActions: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 6,
+    },
+    buttonPrimary: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      gap: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 6,
+      backgroundColor: theme.colors.accent,
+    },
+    buttonPrimaryPressed: {
+      opacity: 0.85,
+    },
+    buttonPrimaryText: {
+      fontSize: 12,
+      fontWeight: "600" as const,
+      color: theme.colors.accentForeground,
+    },
+    buttonSecondary: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 6,
+      backgroundColor: theme.colors.surface2,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    buttonSecondaryPressed: {
+      backgroundColor: theme.colors.surface1,
+    },
+    buttonSecondaryText: {
+      fontSize: 12,
+      color: theme.colors.foreground,
+    },
+    buttonDisabled: {
+      opacity: 0.5,
+    },
+    errorText: {
+      fontSize: 12,
+      color: theme.colors.statusDanger,
+      marginTop: 2,
     },
   };
 }
@@ -109,10 +226,17 @@ export function ProjectList({
   theme,
   compact,
 }: ProjectListProps) {
+  const settings = useSettings(snippetsSettings);
   const [filterText, setFilterText] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftIds, setDraftIds] = useState<string[] | null>(null);
+  const [capturedValues, setCapturedValues] =
+    useState<SnippetsSettingsValues | null>(null);
+  const [capturedRevision, setCapturedRevision] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const styles = useMemo(() => makeProjectListStyles(theme), [theme]);
 
-  // `projects` arrives sorted by SnippetsHome, which also uses that order for its fallback.
   const filteredProjects = useMemo(() => {
     const query = filterText.trim().toLowerCase();
     if (!query) return projects;
@@ -126,34 +250,229 @@ export function ProjectList({
     });
   }, [projects, filterText]);
 
+  const displayedProjects = useMemo(() => {
+    if (!isEditing || draftIds === null) {
+      return filteredProjects;
+    }
+    return orderProjects(projects, draftIds);
+  }, [isEditing, draftIds, filteredProjects, projects]);
+
+  const handleToggleEdit = () => {
+    if (isEditing) {
+      handleCancel();
+    } else {
+      if (settings.status !== "ready") return;
+      setCapturedValues(settings.values);
+      setCapturedRevision(settings.revision);
+      setDraftIds(projects.map((p) => p.projectId));
+      setSaveError(null);
+      setFilterText("");
+      setIsEditing(true);
+    }
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index <= 0) return;
+    const currentIds = displayedProjects.map((p) => p.projectId);
+    const [target] = currentIds.splice(index, 1);
+    currentIds.splice(index - 1, 0, target);
+    setDraftIds(currentIds);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index >= displayedProjects.length - 1) return;
+    const currentIds = displayedProjects.map((p) => p.projectId);
+    const [target] = currentIds.splice(index, 1);
+    currentIds.splice(index + 1, 0, target);
+    setDraftIds(currentIds);
+  };
+
+  const handleMoveToTop = (index: number) => {
+    if (index <= 0) return;
+    const currentIds = displayedProjects.map((p) => p.projectId);
+    const [target] = currentIds.splice(index, 1);
+    currentIds.unshift(target);
+    setDraftIds(currentIds);
+  };
+
+  const handleResetToAZ = () => {
+    setDraftIds([]);
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setDraftIds(null);
+    setCapturedValues(null);
+    setCapturedRevision(null);
+    setSaveError(null);
+  };
+
+  const handleDone = async () => {
+    if (
+      settings.status !== "ready" ||
+      !capturedValues ||
+      !capturedRevision ||
+      draftIds === null
+    ) {
+      setIsEditing(false);
+      return;
+    }
+    setSaveError(null);
+    const nextValues: SnippetsSettingsValues = {
+      ...capturedValues,
+      projectOrder: draftIds,
+    };
+    const success = await settings.save(nextValues, capturedRevision);
+    if (!success) {
+      setSaveError(settings.saveError || "Failed to save project order");
+    } else {
+      setIsEditing(false);
+      setDraftIds(null);
+      setCapturedValues(null);
+      setCapturedRevision(null);
+      setSaveError(null);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {!compact ? (
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Projects</Text>
-        </View>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Projects</Text>
+        {settings.status === "ready" ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Reorder projects"
+            accessibilityState={{ selected: isEditing }}
+            style={({ pressed }) => [
+              styles.reorderButton,
+              isEditing && styles.reorderButtonActive,
+              pressed && styles.reorderButtonPressed,
+            ]}
+            onPress={handleToggleEdit}
+          >
+            <Icon
+              name="ArrowUpDown"
+              size={14}
+              color={isEditing ? theme.colors.accent : theme.colors.foreground}
+            />
+          </Pressable>
+        ) : null}
+      </View>
+
+      {!isEditing ? (
+        <TextInput
+          placeholder="Filter projects"
+          placeholderTextColor={theme.colors.foregroundMuted}
+          value={filterText}
+          onChangeText={setFilterText}
+          style={styles.filterInput}
+          accessibilityLabel="Filter projects"
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+        />
       ) : null}
 
-      <TextInput
-        placeholder="Filter projects"
-        placeholderTextColor={theme.colors.foregroundMuted}
-        value={filterText}
-        onChangeText={setFilterText}
-        style={styles.filterInput}
-        accessibilityLabel="Filter projects"
-        autoCapitalize="none"
-        autoCorrect={false}
-        clearButtonMode="while-editing"
-      />
-
-      {filteredProjects.length === 0 ? (
+      {displayedProjects.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No matching projects</Text>
+          <Text style={styles.emptyText}>
+            {isEditing ? "No projects" : "No matching projects"}
+          </Text>
         </View>
       ) : (
         <View style={styles.list}>
-          {filteredProjects.map((project) => {
-            const isSelected = project.projectId === selectedId;
+          {displayedProjects.map((project, index) => {
+            const isSelected = !isEditing && project.projectId === selectedId;
+            const isFirst = index === 0;
+            const isLast = index === displayedProjects.length - 1;
+
+            if (isEditing) {
+              return (
+                <View key={project.projectId} style={styles.projectRowEdit}>
+                  <View style={styles.projectInfo}>
+                    <Text style={styles.projectName} numberOfLines={1}>
+                      {project.projectDisplayName}
+                    </Text>
+                    <Text
+                      style={styles.projectPath}
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
+                      {shortenPath(project.projectRootPath)}
+                    </Text>
+                  </View>
+                  <View style={styles.rowActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Move ${project.projectDisplayName} up`}
+                      accessibilityState={{ disabled: isFirst }}
+                      disabled={isFirst || settings.saving}
+                      style={({ pressed }) => [
+                        styles.iconButton,
+                        isFirst && styles.iconButtonDisabled,
+                        pressed && !isFirst && styles.iconButtonPressed,
+                      ]}
+                      onPress={() => handleMoveUp(index)}
+                    >
+                      <Icon
+                        name="ChevronUp"
+                        size={14}
+                        color={
+                          isFirst
+                            ? theme.colors.foregroundMuted
+                            : theme.colors.foreground
+                        }
+                      />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Move ${project.projectDisplayName} down`}
+                      accessibilityState={{ disabled: isLast }}
+                      disabled={isLast || settings.saving}
+                      style={({ pressed }) => [
+                        styles.iconButton,
+                        isLast && styles.iconButtonDisabled,
+                        pressed && !isLast && styles.iconButtonPressed,
+                      ]}
+                      onPress={() => handleMoveDown(index)}
+                    >
+                      <Icon
+                        name="ChevronDown"
+                        size={14}
+                        color={
+                          isLast
+                            ? theme.colors.foregroundMuted
+                            : theme.colors.foreground
+                        }
+                      />
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Move ${project.projectDisplayName} to top`}
+                      accessibilityState={{ disabled: isFirst }}
+                      disabled={isFirst || settings.saving}
+                      style={({ pressed }) => [
+                        styles.iconButton,
+                        isFirst && styles.iconButtonDisabled,
+                        pressed && !isFirst && styles.iconButtonPressed,
+                      ]}
+                      onPress={() => handleMoveToTop(index)}
+                    >
+                      <Icon
+                        name="ChevronsUp"
+                        size={14}
+                        color={
+                          isFirst
+                            ? theme.colors.foregroundMuted
+                            : theme.colors.foreground
+                        }
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            }
+
             return (
               <Pressable
                 key={project.projectId}
@@ -168,28 +487,81 @@ export function ProjectList({
                   pressed && isSelected && styles.projectRowPressedSelected,
                 ]}
               >
-                <Text
-                  style={
-                    isSelected
-                      ? styles.projectNameSelected
-                      : styles.projectName
-                  }
-                  numberOfLines={1}
-                >
-                  {project.projectDisplayName}
-                </Text>
-                <Text
-                  style={styles.projectPath}
-                  numberOfLines={1}
-                  ellipsizeMode="middle"
-                >
-                  {shortenPath(project.projectRootPath)}
-                </Text>
+                <View style={styles.projectInfo}>
+                  <Text
+                    style={
+                      isSelected
+                        ? styles.projectNameSelected
+                        : styles.projectName
+                    }
+                    numberOfLines={1}
+                  >
+                    {project.projectDisplayName}
+                  </Text>
+                  <Text
+                    style={styles.projectPath}
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  >
+                    {shortenPath(project.projectRootPath)}
+                  </Text>
+                </View>
               </Pressable>
             );
           })}
         </View>
       )}
+
+      {isEditing ? (
+        <View style={styles.footer}>
+          <View style={styles.footerActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Reset to A–Z"
+              disabled={settings.saving}
+              style={({ pressed }) => [
+                styles.buttonSecondary,
+                settings.saving && styles.buttonDisabled,
+                pressed && !settings.saving && styles.buttonSecondaryPressed,
+              ]}
+              onPress={handleResetToAZ}
+            >
+              <Text style={styles.buttonSecondaryText}>Reset to A–Z</Text>
+            </Pressable>
+            <View style={styles.footerRightActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                disabled={settings.saving}
+                style={({ pressed }) => [
+                  styles.buttonSecondary,
+                  settings.saving && styles.buttonDisabled,
+                  pressed && !settings.saving && styles.buttonSecondaryPressed,
+                ]}
+                onPress={handleCancel}
+              >
+                <Text style={styles.buttonSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Done"
+                disabled={settings.saving}
+                style={({ pressed }) => [
+                  styles.buttonPrimary,
+                  settings.saving && styles.buttonDisabled,
+                  pressed && !settings.saving && styles.buttonPrimaryPressed,
+                ]}
+                onPress={handleDone}
+              >
+                <Text style={styles.buttonPrimaryText}>
+                  {settings.saving ? "Saving..." : "Done"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+          {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
+        </View>
+      ) : null}
     </View>
   );
 }
