@@ -112,18 +112,11 @@ export function ProjectList({
   const [filterText, setFilterText] = useState("");
   const styles = useMemo(() => makeProjectListStyles(theme), [theme]);
 
-  const sortedProjects = useMemo(() => {
-    return [...projects].sort((a, b) =>
-      a.projectDisplayName.localeCompare(b.projectDisplayName, undefined, {
-        sensitivity: "base",
-      }),
-    );
-  }, [projects]);
-
+  // `projects` arrives sorted by SnippetsHome, which also uses that order for its fallback.
   const filteredProjects = useMemo(() => {
     const query = filterText.trim().toLowerCase();
-    if (!query) return sortedProjects;
-    return sortedProjects.filter((project) => {
+    if (!query) return projects;
+    return projects.filter((project) => {
       const name = project.projectDisplayName.toLowerCase();
       const path = project.projectRootPath.toLowerCase();
       const short = shortenPath(project.projectRootPath).toLowerCase();
@@ -131,7 +124,7 @@ export function ProjectList({
         name.includes(query) || path.includes(query) || short.includes(query)
       );
     });
-  }, [sortedProjects, filterText]);
+  }, [projects, filterText]);
 
   return (
     <View style={styles.container}>
