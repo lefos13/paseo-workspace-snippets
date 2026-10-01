@@ -131,6 +131,7 @@ export async function detectScripts(
   const pkgRecord = parsed as Record<string, unknown>;
 
   let pm: PackageManager = "npm";
+  let pmFromField = false;
   if (typeof pkgRecord.packageManager === "string") {
     const rawPm = pkgRecord.packageManager.split("@")[0].trim().toLowerCase();
     if (
@@ -140,10 +141,11 @@ export async function detectScripts(
       rawPm === "npm"
     ) {
       pm = rawPm;
+      pmFromField = true;
     }
   }
 
-  if (pm === "npm") {
+  if (!pmFromField) {
     const pnpmLock = path.join(realDir, "pnpm-lock.yaml");
     const yarnLock = path.join(realDir, "yarn.lock");
     const bunLockb = path.join(realDir, "bun.lockb");
