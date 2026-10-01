@@ -1,6 +1,6 @@
 # paseo-workspace-snippets: implementation plan
 
-Status: plan only. No plugin code exists yet beyond the `paseo plugin init` scaffold.
+Status: implemented (v0.1.0); see README
 
 Target: Paseo 0.10.2 (`@getpaseo/plugin` 0.10.2, `requirements.paseo >=0.10.2`). API names below are
 taken from the installed `.d.ts` files, not only from the deployed docs. The deployed docs already
