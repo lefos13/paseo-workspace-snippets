@@ -123,6 +123,33 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
       color: theme.colors.foregroundMuted,
       textTransform: "lowercase" as const,
     },
+    // Status indicators
+    statusContainer: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 6,
+    },
+    statusDotOpen: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.colors.accent,
+    },
+    statusDotClosed: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.colors.foregroundMuted,
+    },
+    statusLabel: {
+      fontSize: 12,
+      color: theme.colors.foregroundMuted,
+    },
+    tabHintText: {
+      fontSize: 11,
+      color: theme.colors.foregroundMuted,
+      marginTop: 4,
+    },
     // Action buttons
     actionButton: {
       flexDirection: "row" as const,
@@ -134,6 +161,9 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
       backgroundColor: theme.colors.surface2,
       borderWidth: 1,
       borderColor: theme.colors.border,
+    },
+    actionButtonDisabled: {
+      opacity: 0.5,
     },
     actionButtonText: {
       fontSize: 12,

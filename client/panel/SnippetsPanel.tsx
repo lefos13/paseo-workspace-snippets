@@ -1,9 +1,20 @@
 import type { PluginWorkspacePanelProps } from "@getpaseo/plugin/client";
-import { useSettings, useWorkspace } from "@getpaseo/plugin/client";
-import { Modal, ScrollView } from "@getpaseo/plugin/client/react-native";
+import { useRpc, useSettings, useWorkspace } from "@getpaseo/plugin/client";
+import {
+  Modal,
+  ScrollView,
+  useToast,
+} from "@getpaseo/plugin/client/react-native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { snippetsFor } from "../../shared/entries";
+import { entryKey, snippetsFor, terminalName } from "../../shared/entries";
+import {
+  closeEntryRpc,
+  runEntryRpc,
+  stopEntryRpc,
+  terminalStatesRpc,
+} from "../../shared/rpc";
 import type {
   RevisionId,
   SaveResult,
@@ -14,6 +25,23 @@ import { snippetsSettings } from "../../shared/settings";
 import { SnippetEditor } from "./SnippetEditor";
 import { SnippetsSection } from "./SnippetsSection";
 import { makeStyles } from "./styles";
+
+function mapErrorMessage(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (msg.includes("WORKSPACE_UNAVAILABLE")) {
+    return "Workspace is not available on this host";
+  }
+  if (msg.includes("TERMINALS_UNSUPPORTED")) {
+    return "Update the Paseo daemon to run snippets";
+  }
+  if (msg.includes("ENTRY_NOT_FOUND")) {
+    return "Snippet was not found";
+  }
+  if (msg.includes("AMBIGUOUS_NAME")) {
+    return msg.replace(/^.*AMBIGUOUS_NAME:\s*/, "");
+  }
+  return msg;
+}
 
 export function SnippetsPanel({
   theme,
@@ -27,6 +55,21 @@ export function SnippetsPanel({
   }));
 
   const settings = useSettings(snippetsSettings);
+  const toast = useToast();
+  const queryClient = useQueryClient();
+
+  const getTerminalStates = useRpc(terminalStatesRpc);
+  const runEntry = useRpc(runEntryRpc);
+  const stopEntry = useRpc(stopEntryRpc);
+  const closeEntry = useRpc(closeEntryRpc);
+
+  const { data: statesData } = useQuery({
+    queryKey: ["states", workspaceId],
+    queryFn: () => getTerminalStates({ workspaceId }),
+    refetchInterval: 3000,
+  });
+
+  const openTerminals = useMemo(() => statesData?.open ?? {}, [statesData]);
 
   const styles = useMemo(
     () => makeStyles(theme, layout.compact),
@@ -41,6 +84,12 @@ export function SnippetsPanel({
     useState<RevisionId | null>(null);
   const [capturedValues, setCapturedValues] =
     useState<SnippetsSettingsValues | null>(null);
+
+  const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [lastRunSnippetId, setLastRunSnippetId] =
+    useState<RevisionId | null>(null);
 
   const headerTitle = workspace?.name
     ? `Snippets · ${workspace.name}`
@@ -81,9 +130,99 @@ export function SnippetsPanel({
     setEditorOpen(true);
   };
 
-  const handleSaveSnippet = async (itemToSave: Snippet): SaveResult => {
+  const handleRun = async (snippet: Snippet) => {
+    setPendingActions((prev) => ({ ...prev, [snippet.id]: true }));
+    try {
+      await runEntry({
+        workspaceId,
+        entryKey: entryKey("snippet", snippet.id),
+      });
+      setLastRunSnippetId(snippet.id);
+      await queryClient.invalidateQueries({
+        queryKey: ["states", workspaceId],
+      });
+    } catch (err) {
+      toast.error(mapErrorMessage(err));
+    } finally {
+      setPendingActions((prev) => ({ ...prev, [snippet.id]: false }));
+    }
+  };
+
+  const handleRestart = async (snippet: Snippet) => {
+    setPendingActions((prev) => ({ ...prev, [snippet.id]: true }));
+    try {
+      await runEntry({
+        workspaceId,
+        entryKey: entryKey("snippet", snippet.id),
+      });
+      setLastRunSnippetId(snippet.id);
+      await queryClient.invalidateQueries({
+        queryKey: ["states", workspaceId],
+      });
+    } catch (err) {
+      toast.error(mapErrorMessage(err));
+    } finally {
+      setPendingActions((prev) => ({ ...prev, [snippet.id]: false }));
+    }
+  };
+
+  const handleStop = async (snippet: Snippet) => {
+    setPendingActions((prev) => ({ ...prev, [snippet.id]: true }));
+    try {
+      await stopEntry({
+        workspaceId,
+        entryKey: entryKey("snippet", snippet.id),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["states", workspaceId],
+      });
+    } catch (err) {
+      toast.error(mapErrorMessage(err));
+    } finally {
+      setPendingActions((prev) => ({ ...prev, [snippet.id]: false }));
+    }
+  };
+
+  const handleClose = async (snippet: Snippet) => {
+    setPendingActions((prev) => ({ ...prev, [snippet.id]: true }));
+    try {
+      await closeEntry({
+        workspaceId,
+        entryKey: entryKey("snippet", snippet.id),
+      });
+      if (lastRunSnippetId === snippet.id) {
+        setLastRunSnippetId(null);
+      }
+      await queryClient.invalidateQueries({
+        queryKey: ["states", workspaceId],
+      });
+    } catch (err) {
+      toast.error(mapErrorMessage(err));
+    } finally {
+      setPendingActions((prev) => ({ ...prev, [snippet.id]: false }));
+    }
+  };
+
+  const handleSaveSnippet = async (
+    itemToSave: Snippet,
+    closeOldTerminal = false,
+  ): SaveResult => {
     if (settings.status !== "ready" || !capturedRevision || !capturedValues) {
       return false;
+    }
+
+    if (closeOldTerminal && editingSnippet) {
+      try {
+        await closeEntry({
+          workspaceId,
+          entryKey: entryKey("snippet", editingSnippet.id),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: ["states", workspaceId],
+        });
+      } catch (err) {
+        console.error("Failed to close old terminal on rename:", err);
+      }
     }
 
     const projectKey = workspace?.projectRootPath;
@@ -197,8 +336,26 @@ export function SnippetsPanel({
     return success;
   };
 
-  const handleDeleteSnippet = async (snippet: Snippet): SaveResult => {
+  const handleDeleteSnippet = async (
+    snippet: Snippet,
+    closeTerminal = false,
+  ): SaveResult => {
     if (settings.status !== "ready") return false;
+
+    if (closeTerminal) {
+      try {
+        await closeEntry({
+          workspaceId,
+          entryKey: entryKey("snippet", snippet.id),
+        });
+        await queryClient.invalidateQueries({
+          queryKey: ["states", workspaceId],
+        });
+      } catch (err) {
+        console.error("Failed to close terminal on delete:", err);
+      }
+    }
+
     const revision = capturedRevision ?? settings.revision;
     const baseValues = capturedValues ?? settings.values;
 
@@ -242,6 +399,11 @@ export function SnippetsPanel({
     await settings.reset();
     setShowResetConfirm(false);
   };
+
+  const isEditingSnippetTerminalOpen = Boolean(
+    editingSnippet &&
+      openTerminals[terminalName("snippet", editingSnippet.name)],
+  );
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
@@ -311,8 +473,15 @@ export function SnippetsPanel({
       {settings.status === "ready" ? (
         <SnippetsSection
           snippets={allSnippets}
+          openTerminals={openTerminals}
+          pendingActionEntries={pendingActions}
+          lastRunSnippetId={lastRunSnippetId}
           theme={theme}
           compact={layout.compact}
+          onRun={handleRun}
+          onRestart={handleRestart}
+          onStop={handleStop}
+          onClose={handleClose}
           onAdd={handleOpenAdd}
           onEdit={handleOpenEdit}
           onDelete={handleOpenDelete}
@@ -325,6 +494,7 @@ export function SnippetsPanel({
         snippet={editingSnippet}
         allSnippets={allSnippets}
         hasProjectRoot={Boolean(workspace?.projectRootPath)}
+        isTerminalOpen={isEditingSnippetTerminalOpen}
         theme={theme}
         compact={layout.compact}
         saving={settings.saving}

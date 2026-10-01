@@ -2,14 +2,22 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
+import { terminalName } from "../../shared/entries";
 import type { Snippet } from "../../shared/settings";
 import { EntryRow } from "./EntryRow";
 import { makeStyles } from "./styles";
 
 export interface SnippetsSectionProps {
   snippets: Snippet[];
+  openTerminals: Record<string, string>;
+  pendingActionEntries: Record<string, boolean>;
+  lastRunSnippetId: string | null;
   theme: PluginTheme;
   compact: boolean;
+  onRun: (snippet: Snippet) => void;
+  onRestart: (snippet: Snippet) => void;
+  onStop: (snippet: Snippet) => void;
+  onClose: (snippet: Snippet) => void;
   onAdd: () => void;
   onEdit: (snippet: Snippet) => void;
   onDelete: (snippet: Snippet) => void;
@@ -17,8 +25,15 @@ export interface SnippetsSectionProps {
 
 export function SnippetsSection({
   snippets,
+  openTerminals,
+  pendingActionEntries,
+  lastRunSnippetId,
   theme,
   compact,
+  onRun,
+  onRestart,
+  onStop,
+  onClose,
   onAdd,
   onEdit,
   onDelete,
@@ -49,16 +64,30 @@ export function SnippetsSection({
         </View>
       ) : (
         <View style={styles.list}>
-          {snippets.map((snippet) => (
-            <EntryRow
-              key={snippet.id}
-              snippet={snippet}
-              theme={theme}
-              compact={compact}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          ))}
+          {snippets.map((snippet) => {
+            const termName = terminalName("snippet", snippet.name);
+            const isOpen = Boolean(openTerminals[termName]);
+            const isActionPending = Boolean(pendingActionEntries[snippet.id]);
+            const showTabHint = lastRunSnippetId === snippet.id;
+
+            return (
+              <EntryRow
+                key={snippet.id}
+                snippet={snippet}
+                theme={theme}
+                compact={compact}
+                isOpen={isOpen}
+                isActionPending={isActionPending}
+                showTabHint={showTabHint}
+                onRun={onRun}
+                onRestart={onRestart}
+                onStop={onStop}
+                onClose={onClose}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            );
+          })}
         </View>
       )}
     </View>

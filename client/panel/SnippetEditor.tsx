@@ -11,12 +11,13 @@ export interface SnippetEditorProps {
   snippet?: Snippet | null;
   allSnippets: Snippet[];
   hasProjectRoot: boolean;
+  isTerminalOpen?: boolean;
   theme: PluginTheme;
   compact: boolean;
   saving?: boolean;
   saveError?: string | null;
-  onSave: (snippet: Snippet) => SaveResult;
-  onDelete?: (snippet: Snippet) => SaveResult;
+  onSave: (snippet: Snippet, closeOldTerminal?: boolean) => SaveResult;
+  onDelete?: (snippet: Snippet, closeTerminal?: boolean) => SaveResult;
   initialConfirmDelete?: boolean;
 }
 
@@ -26,6 +27,7 @@ export function SnippetEditor({
   snippet,
   allSnippets,
   hasProjectRoot,
+  isTerminalOpen = false,
   theme,
   compact,
   saving = false,
@@ -43,6 +45,7 @@ export function SnippetEditor({
   );
   const [errors, setErrors] = useState<{ name?: string; command?: string }>({});
   const [confirmingDelete, setConfirmingDelete] = useState(initialConfirmDelete);
+  const [confirmingRename, setConfirmingRename] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -52,9 +55,30 @@ export function SnippetEditor({
       setScope(snippet?.scope ?? (hasProjectRoot ? "project" : "workspace"));
       setErrors({});
       setConfirmingDelete(Boolean(initialConfirmDelete));
+      setConfirmingRename(false);
       setIsDeleting(false);
     }
   }, [open, snippet, hasProjectRoot, initialConfirmDelete]);
+
+  const proceedWithSave = async (closeOldTerminal: boolean) => {
+    const trimmedName = name.trim();
+    const trimmedCommand = command.trim();
+
+    const itemToSave: Snippet = {
+      id:
+        snippet?.id ??
+        `snp_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`,
+      name: trimmedName,
+      command: trimmedCommand,
+      scope,
+    };
+
+    const success = await onSave(itemToSave, closeOldTerminal);
+    if (success) {
+      setConfirmingRename(false);
+      onOpenChange(false);
+    }
+  };
 
   const handleSave = async () => {
     const trimmedName = name.trim();
@@ -88,25 +112,19 @@ export function SnippetEditor({
       return;
     }
 
-    const itemToSave: Snippet = {
-      id:
-        snippet?.id ??
-        `snp_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`,
-      name: trimmedName,
-      command: trimmedCommand,
-      scope,
-    };
-
-    const success = await onSave(itemToSave);
-    if (success) {
-      onOpenChange(false);
+    // Check if renaming with an open terminal
+    if (snippet && isTerminalOpen && trimmedName !== snippet.name) {
+      setConfirmingRename(true);
+      return;
     }
+
+    await proceedWithSave(false);
   };
 
   const handleConfirmDelete = async () => {
     if (!snippet || !onDelete) return;
     setIsDeleting(true);
-    const success = await onDelete(snippet);
+    const success = await onDelete(snippet, isTerminalOpen);
     setIsDeleting(false);
     if (success) {
       onOpenChange(false);
@@ -114,6 +132,50 @@ export function SnippetEditor({
   };
 
   const currentSnippetName = snippet?.name || name || "new";
+
+  if (confirmingRename && snippet) {
+    return (
+      <Modal
+        title={`Rename "${snippet.name}"?`}
+        open={open}
+        onOpenChange={onOpenChange}
+      >
+        <Modal.Content style={styles.formContainer}>
+          <Text style={styles.stateBannerText}>
+            Snippet &quot;{snippet.name}&quot; has an open terminal (snippet:{snippet.name}).
+            Renaming will close this terminal. Proceed with rename?
+          </Text>
+
+          {saveError ? (
+            <Text style={styles.fieldError}>{saveError}</Text>
+          ) : null}
+
+          <View style={styles.modalActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Cancel renaming snippet ${snippet.name}`}
+              style={styles.buttonSecondary}
+              onPress={() => setConfirmingRename(false)}
+            >
+              <Text style={styles.buttonSecondaryText}>Cancel</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Confirm rename and close terminal for snippet ${snippet.name}`}
+              style={styles.buttonDangerSolid}
+              disabled={saving}
+              onPress={() => proceedWithSave(true)}
+            >
+              <Text style={styles.buttonDangerSolidText}>
+                {saving ? "Saving..." : "Close terminal and rename"}
+              </Text>
+            </Pressable>
+          </View>
+        </Modal.Content>
+      </Modal>
+    );
+  }
 
   if (confirmingDelete && snippet) {
     return (
@@ -124,8 +186,10 @@ export function SnippetEditor({
       >
         <Modal.Content style={styles.formContainer}>
           <Text style={styles.stateBannerText}>
-            Are you sure you want to delete snippet &quot;{snippet.name}&quot;? This action
-            cannot be undone.
+            Are you sure you want to delete snippet &quot;{snippet.name}&quot;?
+            {isTerminalOpen
+              ? " Its open terminal will also be closed."
+              : " This action cannot be undone."}
           </Text>
 
           {saveError ? (
@@ -150,13 +214,21 @@ export function SnippetEditor({
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Confirm delete snippet ${snippet.name}`}
+              accessibilityLabel={
+                isTerminalOpen
+                  ? `Delete and close terminal for snippet ${snippet.name}`
+                  : `Confirm delete snippet ${snippet.name}`
+              }
               style={styles.buttonDangerSolid}
               disabled={isDeleting}
               onPress={handleConfirmDelete}
             >
               <Text style={styles.buttonDangerSolidText}>
-                {isDeleting ? "Deleting..." : "Delete"}
+                {isDeleting
+                  ? "Deleting..."
+                  : isTerminalOpen
+                    ? "Delete and close terminal"
+                    : "Delete"}
               </Text>
             </Pressable>
           </View>
