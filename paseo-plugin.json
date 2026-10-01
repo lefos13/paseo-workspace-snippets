@@ -1,0 +1,7 @@
+{
+  "id": "paseo-workspace-snippets",
+  "description": "Run saved command snippets and package.json scripts in workspace terminals",
+  "requirements": {
+    "paseo": ">=0.10.2"
+  }
+}
