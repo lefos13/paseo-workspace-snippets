@@ -70,3 +70,15 @@ export const entryOutputRpc = defineRpc({
     totalLines: z.number(),
   }),
 });
+
+export const runByNameRpc = defineRpc({
+  name: "entry.run-by-name", // slash command
+  input: WorkspaceInput.extend({ name: z.string().trim().min(1) }),
+  output: z.object({ entryKey: z.string(), terminalId: z.string() }),
+});
+
+export const listEntriesRpc = defineRpc({
+  name: "entry.list", // slash command with no args, error hints
+  input: WorkspaceInput,
+  output: z.object({ names: z.array(z.string()) }),
+});
