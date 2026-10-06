@@ -24,32 +24,46 @@ export async function resolveProject(
   };
 }
 
+function timestamp(value: string | null | undefined): number {
+  const parsed = value ? Date.parse(value) : NaN;
+  return Number.isNaN(parsed) ? -Infinity : parsed;
+}
+
 export async function findLocalWorkspace(
   paseo: Paseo,
   projectRootPath: string,
 ): Promise<string | null> {
-  const { entries } = await paseo.workspaces.list();
   const normalizedRoot = projectRootPath.replace(/[/\\]+$/, "");
-  // Several workspaces can share a directory; prefer the most recently active.
-  // Workspaces without activity rank lowest, and ties go to the later entry
-  // because the daemon lists older workspaces first.
-  let best: { id: string; activityAt: number } | null = null;
-  for (const ws of entries) {
-    if (ws.archivingAt) continue;
-    // Older daemons may omit workspaceDirectory; only a local checkout or plain
-    // directory workspace can then be assumed to sit at the project root.
-    const rawDir =
-      ws.workspaceDirectory ??
-      (ws.workspaceKind === "local_checkout" || ws.workspaceKind === "directory"
-        ? ws.projectRootPath
-        : undefined);
-    const normalizedDir = rawDir ? rawDir.replace(/[/\\]+$/, "") : "";
-    if (normalizedDir !== normalizedRoot) continue;
-    const parsed = ws.activityAt ? Date.parse(ws.activityAt) : NaN;
-    const activityAt = Number.isNaN(parsed) ? -Infinity : parsed;
-    if (!best || activityAt >= best.activityAt) {
-      best = { id: ws.id, activityAt };
+  // Several workspaces can share a directory; prefer the most recent one.
+  // activityAt is often null, so statusEnteredAt (last agent status change,
+  // which drives the sidebar order) also counts.
+  let best: { id: string; recency: number } | null = null;
+  let cursor: string | undefined;
+  do {
+    // The daemon pages workspace lists, so walk every page.
+    const { entries, pageInfo } = await paseo.workspaces.list({
+      page: { limit: 200, ...(cursor ? { cursor } : {}) },
+    });
+    for (const ws of entries) {
+      if (ws.archivingAt) continue;
+      // Older daemons may omit workspaceDirectory; only a local checkout or plain
+      // directory workspace can then be assumed to sit at the project root.
+      const rawDir =
+        ws.workspaceDirectory ??
+        (ws.workspaceKind === "local_checkout" || ws.workspaceKind === "directory"
+          ? ws.projectRootPath
+          : undefined);
+      const normalizedDir = rawDir ? rawDir.replace(/[/\\]+$/, "") : "";
+      if (normalizedDir !== normalizedRoot) continue;
+      const recency = Math.max(
+        timestamp(ws.activityAt),
+        timestamp(ws.statusEnteredAt),
+      );
+      if (!best || recency > best.recency) {
+        best = { id: ws.id, recency };
+      }
     }
-  }
+    cursor = pageInfo?.hasMore ? (pageInfo.nextCursor ?? undefined) : undefined;
+  } while (cursor);
   return best?.id ?? null;
 }
