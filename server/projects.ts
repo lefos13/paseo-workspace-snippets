@@ -30,6 +30,10 @@ export async function findLocalWorkspace(
 ): Promise<string | null> {
   const { entries } = await paseo.workspaces.list();
   const normalizedRoot = projectRootPath.replace(/[/\\]+$/, "");
+  // Several workspaces can share a directory; prefer the most recently active.
+  // Workspaces without activity rank lowest, and ties go to the later entry
+  // because the daemon lists older workspaces first.
+  let best: { id: string; activityAt: number } | null = null;
   for (const ws of entries) {
     if (ws.archivingAt) continue;
     // Older daemons may omit workspaceDirectory; only a local checkout or plain
@@ -40,9 +44,12 @@ export async function findLocalWorkspace(
         ? ws.projectRootPath
         : undefined);
     const normalizedDir = rawDir ? rawDir.replace(/[/\\]+$/, "") : "";
-    if (normalizedDir === normalizedRoot) {
-      return ws.id;
+    if (normalizedDir !== normalizedRoot) continue;
+    const parsed = ws.activityAt ? Date.parse(ws.activityAt) : NaN;
+    const activityAt = Number.isNaN(parsed) ? -Infinity : parsed;
+    if (!best || activityAt >= best.activityAt) {
+      best = { id: ws.id, activityAt };
     }
   }
-  return null;
+  return best?.id ?? null;
 }

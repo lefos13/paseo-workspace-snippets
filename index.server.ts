@@ -188,7 +188,15 @@ export default function contribute(server: PluginServerContext) {
     async ({ projectId, entryKey }, { paseo }) => {
       try {
         const project = await resolveProject(paseo, projectId);
-        const ws = await paseo.workspaces.open(project.projectRootPath);
+        // workspaces.open() returns the oldest workspace at the path, so reuse
+        // the most recent one and only open a new one when none exists.
+        const existingId = await findLocalWorkspace(
+          paseo,
+          project.projectRootPath,
+        );
+        const ws = existingId
+          ? { id: existingId }
+          : await paseo.workspaces.open(project.projectRootPath);
         const entry = await resolveEntry(settings, entryKey, {
           directory: project.projectRootPath,
           projectRootPath: project.projectRootPath,
