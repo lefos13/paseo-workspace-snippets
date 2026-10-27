@@ -4,6 +4,7 @@ import path from "node:path";
 import type {
   DetectedPackage,
   DetectedScript,
+  PackageManager,
   ShellScript,
 } from "../shared/discovery";
 import {
@@ -22,7 +23,6 @@ import {
 } from "./discoverable";
 import {
   detectPackage,
-  inheritedPackageManager,
   invalidPackage,
 } from "./package-json";
 import type { ResolvedWorkspace } from "./workspace";
@@ -164,6 +164,22 @@ async function findScriptByIdentifier(
     candidates.push({ relDir, scriptName: identifier.slice(index + 1) });
   }
 
+  const deepest = candidates[0]
+    ? relativeSegments(candidates[0].relDir)
+    : null;
+  if (!deepest) return { root, match: null };
+
+  // Every candidate folder is a prefix of the same identifier path, so read
+  // the ancestor Package managers once instead of once per candidate.
+  const inherited: PackageManager[] = [root.packageManager];
+  let ancestor = workspaceRoot;
+  for (let index = 0; index < deepest.length - 1; index += 1) {
+    ancestor = path.join(ancestor, deepest[index]);
+    inherited.push(
+      (await detectPackage(ancestor, "", inherited[index])).packageManager,
+    );
+  }
+
   for (const { relDir, scriptName } of candidates) {
     const segments = relativeSegments(relDir);
     if (!segments) continue;
@@ -173,7 +189,7 @@ async function findScriptByIdentifier(
     const detected = await detectPackage(
       directory,
       relDir,
-      await inheritedPackageManager(workspaceRoot, relDir),
+      inherited[Math.max(0, segments.length - 1)],
     );
     if (detected.status !== "ok") continue;
 
