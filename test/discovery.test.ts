@@ -191,7 +191,7 @@ test("finds Nested packages at several depths and in submodule-style folders", a
         {
           name: "dev",
           body: "next dev",
-          command: "cd apps/web && npm run dev",
+          command: "(cd apps/web && npm run dev)",
         },
       ]);
       assert.doesNotThrow(() => discoveryOutputSchema.parse(result));
@@ -321,7 +321,7 @@ test("inherits the Package manager from the nearest ancestor Package", async () 
 
       const web = result.packages.find((pkg) => pkg.relDir === "apps/web");
       assert.equal(web?.packageManager, "pnpm");
-      assert.equal(web?.scripts[0].command, "cd apps/web && pnpm run dev");
+      assert.equal(web?.scripts[0].command, "(cd apps/web && pnpm run dev)");
 
       const root = result.packages.find((pkg) => pkg.relDir === "");
       assert.equal(root?.packageManager, "pnpm");
@@ -347,11 +347,11 @@ test("prefers a Nested package's own lockfile or packageManager field", async ()
 
       const yarn = result.packages.find((pkg) => pkg.relDir === "apps/yarn");
       assert.equal(yarn?.packageManager, "yarn");
-      assert.equal(yarn?.scripts[0].command, "cd apps/yarn && yarn run dev");
+      assert.equal(yarn?.scripts[0].command, "(cd apps/yarn && yarn run dev)");
 
       const bun = result.packages.find((pkg) => pkg.relDir === "apps/bun");
       assert.equal(bun?.packageManager, "bun");
-      assert.equal(bun?.scripts[0].command, "cd apps/bun && bun run dev");
+      assert.equal(bun?.scripts[0].command, "(cd apps/bun && bun run dev)");
     },
   );
 });
@@ -368,7 +368,7 @@ test("stops Package manager inheritance at the workspace root", async () => {
 
       const web = result.packages.find((pkg) => pkg.relDir === "apps/web");
       assert.equal(web?.packageManager, "npm");
-      assert.equal(web?.scripts[0].command, "cd apps/web && npm run dev");
+      assert.equal(web?.scripts[0].command, "(cd apps/web && npm run dev)");
     },
   );
 });
@@ -383,7 +383,7 @@ test("quotes a Nested directory path containing spaces", async () => {
       const result = await discoverEntries(directory);
 
       const app = result.packages.find((pkg) => pkg.relDir === "my app");
-      assert.equal(app?.scripts[0].command, "cd 'my app' && npm run dev");
+      assert.equal(app?.scripts[0].command, "(cd 'my app' && npm run dev)");
     },
   );
 });

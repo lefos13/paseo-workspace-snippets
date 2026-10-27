@@ -216,7 +216,7 @@ test("resolves a Nested Script by key to a cd command and Qualified terminal nam
       assert.deepEqual(entry, {
         key: "script:apps/web/dev",
         label: "dev",
-        command: "cd apps/web && pnpm run dev",
+        command: "(cd apps/web && pnpm run dev)",
         terminalName: "script:apps/web/dev",
       });
     },
@@ -309,7 +309,7 @@ test("resolves a Nested Script by Qualified name", async () => {
       assert.deepEqual(entry, {
         key: "script:apps/web/dev",
         label: "dev",
-        command: "cd apps/web && npm run dev",
+        command: "(cd apps/web && npm run dev)",
         terminalName: "script:apps/web/dev",
       });
     },
@@ -438,7 +438,7 @@ test("agrees with key resolution when a slash Script name collides with a Qualif
       );
 
       assert.deepEqual(byName, byKey);
-      assert.equal(byKey.command, "cd apps/web && npm run dev");
+      assert.equal(byKey.command, "(cd apps/web && npm run dev)");
     },
   );
 });

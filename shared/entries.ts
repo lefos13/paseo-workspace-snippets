@@ -62,5 +62,7 @@ export function scriptCommand(
   relDir = "",
 ): string {
   const command = `${pm} run ${shellQuote(scriptName)}`;
-  return relDir ? `cd ${shellQuote(relDir)} && ${command}` : command;
+  // The subshell keeps the interactive shell's cwd, so Restart can re-send the
+  // command into the same terminal instead of failing on `cd`.
+  return relDir ? `(cd ${shellQuote(relDir)} && ${command})` : command;
 }

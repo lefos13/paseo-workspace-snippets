@@ -60,7 +60,7 @@ Group collapse state is remembered per project for the current app session, not 
 
 ### Entry Actions
 
-- **Run**: Creates a dedicated terminal tab named `script:<name>`, `script:<package>/<name>`, `shell:<path>` or `snippet:<name>` and executes the command. Nested Scripts `cd` into their Package folder first; Shell scripts and Snippets run from the workspace root.
+- **Run**: Creates a dedicated terminal tab named `script:<name>`, `script:<package>/<name>`, `shell:<path>` or `snippet:<name>` and executes the command. Nested Scripts run in a subshell that `cd`s into their Package folder, so the terminal's own working directory is unchanged and **Restart** can re-send the same command. Shell scripts and Snippets run from the workspace root.
 - **Restart**: Sends `C-c` to interrupt any existing process, waits briefly, and executes the command again.
 - **Stop**: Sends `C-c` to interrupt the running command without closing the terminal tab.
 - **Close**: Terminates and closes the terminal tab.
@@ -95,7 +95,7 @@ Shell scripts are every `*.sh` file found by the same walk. An executable file r
 
 ### Qualified Names and Commands
 
-A Root package Script keeps its bare name (`dev`, terminal tab `script:dev`). A Nested package Script uses `<folder>/<name>` (for example `apps/web/dev`, terminal tab `script:apps/web/dev`), so two Packages can both have a `dev` Script. Nested Scripts run as `cd <folder> && <pm> run <name>`; Root Scripts run as `<pm> run <name>`.
+A Root package Script keeps its bare name (`dev`, terminal tab `script:dev`). A Nested package Script uses `<folder>/<name>` (for example `apps/web/dev`, terminal tab `script:apps/web/dev`), so two Packages can both have a `dev` Script. Nested Scripts run as `(cd <folder> && <pm> run <name>)`; Root Scripts run as `<pm> run <name>`.
 
 ### Package Manager
 
@@ -105,7 +105,7 @@ For each Package, the Package manager is detected in order:
 3. The nearest ancestor Package's Package manager, up to the workspace root.
 4. `npm`.
 
-Commands use that Package manager's `run` (`pnpm run dev`, `cd apps/web && yarn run build`). Names containing characters outside `[A-Za-z0-9:._/-]` are shell-quoted.
+Commands use that Package manager's `run` (`pnpm run dev`, `(cd apps/web && yarn run build)`). Names containing characters outside `[A-Za-z0-9:._/-]` are shell-quoted.
 
 ## Relation to paseo.json Scripts and Services
 

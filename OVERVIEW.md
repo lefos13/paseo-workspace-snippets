@@ -10,7 +10,7 @@ Requires Paseo 0.10.2 or newer. Nothing to configure.
 
 - Each snippet is scoped either to a project, where it is shared by every worktree of that project, or to a single workspace directory.
 - Scripts are detected in the Root package and in Nested packages up to four folders deep (50 Packages max), skipping `node_modules`, `.git`, `dist`, `build`, `.next` and dot-folders; symlinked folders are not followed. The Scripts section groups them as `<folder> · <package manager>`, with the Root package expanded and Nested packages collapsed by default.
-- A Nested Script runs as `cd <folder> && <pm> run <script>` with the nearest Package manager (its own `packageManager` field or lockfile, otherwise an ancestor's, up to the workspace root; npm by default).
+- A Nested Script runs as `(cd <folder> && <pm> run <script>)` with the nearest Package manager (its own `packageManager` field or lockfile, otherwise an ancestor's, up to the workspace root; npm by default). The subshell leaves the terminal's working directory alone, so Restart can re-send the command.
 - Every `*.sh` file is listed under Shell scripts, grouped by folder. Executable files run as `./path` (honouring their shebang), the rest with `bash path`, always from the workspace root; the executable bit is optional. The section has its own Show/Hide toggle.
 - `/snippet <name>` also reaches Nested Scripts by Qualified name (`apps/web/dev`) and Shell scripts by path or basename (`scripts/deploy.sh`, `deploy`). It prefers an exact Snippet, then an exact Root Script, then an exact Shell script path, then an exact Qualified name, then a unique case-insensitive match; otherwise it lists the candidates.
 - Package and folder groups remember their collapsed state per project for the app session.
