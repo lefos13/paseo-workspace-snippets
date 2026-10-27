@@ -1,21 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import type {
+  DetectedPackage,
+  DetectedScript,
+  PackageManager,
+} from "../shared/discovery";
 import { scriptCommand } from "../shared/entries";
-
-export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
-
-export interface DetectedScript {
-  name: string;
-  body: string;
-  command: string;
-}
-
-export interface DetectScriptsResult {
-  status: "ok" | "missing" | "invalid";
-  error: string | null;
-  packageManager: PackageManager;
-  scripts: DetectedScript[];
-}
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
@@ -26,9 +16,16 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-export async function detectScripts(
+/**
+ * Detects one Package: its `package.json` Scripts and Package manager.
+ *
+ * `relDir` is the Package directory relative to the workspace root ("" for the
+ * Root package) and is copied onto the result.
+ */
+export async function detectPackage(
   directory: string,
-): Promise<DetectScriptsResult> {
+  relDir: string,
+): Promise<DetectedPackage> {
   let realDir: string;
   try {
     realDir = await fs.realpath(directory);
@@ -36,6 +33,7 @@ export async function detectScripts(
     const error = err as { code?: string };
     if (error?.code === "ENOENT") {
       return {
+        relDir,
         status: "missing",
         error: null,
         packageManager: "npm",
@@ -54,6 +52,7 @@ export async function detectScripts(
     const error = err as { code?: string };
     if (error?.code === "ENOENT") {
       return {
+        relDir,
         status: "missing",
         error: null,
         packageManager: "npm",
@@ -77,6 +76,7 @@ export async function detectScripts(
     const error = err as { code?: string };
     if (error?.code === "ENOENT") {
       return {
+        relDir,
         status: "missing",
         error: null,
         packageManager: "npm",
@@ -88,6 +88,7 @@ export async function detectScripts(
 
   if (stats.size > 1024 * 1024) {
     return {
+      relDir,
       status: "invalid",
       error: `package.json exceeds 1 MiB limit (${stats.size} bytes)`,
       packageManager: "npm",
@@ -100,6 +101,7 @@ export async function detectScripts(
     content = await fs.readFile(realFile, "utf-8");
   } catch (err: unknown) {
     return {
+      relDir,
       status: "invalid",
       error: err instanceof Error ? err.message : String(err),
       packageManager: "npm",
@@ -112,6 +114,7 @@ export async function detectScripts(
     parsed = JSON.parse(content);
   } catch (err: unknown) {
     return {
+      relDir,
       status: "invalid",
       error: `Failed to parse package.json: ${err instanceof Error ? err.message : String(err)}`,
       packageManager: "npm",
@@ -121,6 +124,7 @@ export async function detectScripts(
 
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     return {
+      relDir,
       status: "invalid",
       error: "package.json root is not an object",
       packageManager: "npm",
@@ -167,6 +171,7 @@ export async function detectScripts(
       Array.isArray(pkgRecord.scripts)
     ) {
       return {
+        relDir,
         status: "invalid",
         error: "package.json scripts field must be an object",
         packageManager: pm,
@@ -192,6 +197,7 @@ export async function detectScripts(
   }
 
   return {
+    relDir,
     status: "ok",
     error: null,
     packageManager: pm,

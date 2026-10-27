@@ -12,7 +12,7 @@ import { Pressable, Text, View } from "react-native";
 import { entryKey, terminalName } from "../../shared/entries";
 import {
   closeEntryRpc,
-  projectDetectRpc,
+  discoverProjectRpc,
   projectRunEntryRpc,
   projectStatesRpc,
   stopEntryRpc,
@@ -87,7 +87,7 @@ export function SnippetsHome({
   const projectRootPath = selectedProject?.projectRootPath;
 
   const getProjectStates = useRpc(projectStatesRpc);
-  const getProjectScripts = useRpc(projectDetectRpc);
+  const discoverProject = useRpc(discoverProjectRpc);
   const runProjectEntry = useRpc(projectRunEntryRpc);
   const stopEntry = useRpc(stopEntryRpc);
   const closeEntry = useRpc(closeEntryRpc);
@@ -99,9 +99,9 @@ export function SnippetsHome({
     refetchInterval: 3000,
   });
 
-  const { data: scriptsData, error: scriptsQueryError } = useQuery({
-    queryKey: ["projectDetect", projectId],
-    queryFn: () => getProjectScripts({ projectId: projectId! }),
+  const { data: discoveryData, error: discoveryQueryError } = useQuery({
+    queryKey: ["projectDiscover", projectId],
+    queryFn: () => discoverProject({ projectId: projectId! }),
     enabled: Boolean(projectId),
   });
 
@@ -129,21 +129,14 @@ export function SnippetsHome({
   const showScripts =
     settings.status === "ready" ? settings.values.showScripts : true;
 
-  const scriptsStatus = useMemo(() => {
-    if (scriptsQueryError) return "invalid";
-    return scriptsData?.status ?? "missing";
-  }, [scriptsQueryError, scriptsData]);
-
-  const scriptsError = useMemo(() => {
-    if (scriptsQueryError) return mapErrorMessage(scriptsQueryError);
-    return scriptsData?.error ?? null;
-  }, [scriptsQueryError, scriptsData]);
-
-  const scriptsPackageManager = scriptsData?.packageManager ?? "npm";
-  const scriptsList = useMemo(
-    () => scriptsData?.scripts ?? [],
-    [scriptsData?.scripts],
+  const packages = useMemo(
+    () => discoveryData?.packages ?? [],
+    [discoveryData?.packages],
   );
+
+  const discoveryError = discoveryQueryError
+    ? mapErrorMessage(discoveryQueryError)
+    : null;
 
   const terminalsUnsupported = isTerminalsUnsupported(statesError);
   const projectUnavailable = isProjectUnavailable(statesError);
@@ -152,7 +145,9 @@ export function SnippetsHome({
   const handleRefresh = async () => {
     if (!projectId) return;
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["projectDetect", projectId] }),
+      queryClient.invalidateQueries({
+        queryKey: ["projectDiscover", projectId],
+      }),
       queryClient.invalidateQueries({ queryKey: ["projectStates", projectId] }),
     ]);
   };
@@ -522,10 +517,8 @@ export function SnippetsHome({
               <ScriptsSection
                 workspaceId={workspaceId}
                 directory={selectedProject.projectRootPath}
-                status={scriptsStatus}
-                error={scriptsError}
-                packageManager={scriptsPackageManager}
-                scripts={scriptsList}
+                packages={packages}
+                loadError={discoveryError}
                 showScripts={showScripts}
                 onToggleShowScripts={handleToggleShowScripts}
                 openTerminals={openTerminals}
