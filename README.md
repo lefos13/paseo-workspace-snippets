@@ -89,7 +89,7 @@ When adding or editing a snippet:
 
 The plugin walks the workspace root and every folder below it, up to four levels deep (the root is level 0). It stops after 50 Packages and skips `node_modules`, `.git`, `dist`, `build`, `.next` and any dot-folder. It does not read `.gitignore` or workspace declarations (`workspaces`, `pnpm-workspace.yaml`): any folder with a `package.json` is a Nested package. Symlinked folders are not followed. A symlinked `package.json` must resolve inside its own Package folder, and a symlinked `*.sh` file must resolve inside the workspace.
 
-Packages without Scripts are hidden, and a broken Nested `package.json` shows its error inside its group without hiding the other Packages. When the 50-Package cap is hit, or a folder at the depth limit still holds a `package.json` or `*.sh` below it, the Scripts section shows "Scan hit its limit; some Packages may be missing." Plain source folders at the depth limit do not trigger the note.
+Packages without Scripts are hidden, and a broken `package.json` (Root included) shows its error inside its group without hiding the other Packages. When the 50-Package cap is hit, or a folder at the depth limit still holds a `package.json` or `*.sh` below it, the Scripts section shows "Scan hit its limit; some Packages may be missing." Plain source folders at the depth limit do not trigger the note.
 
 Shell scripts are every `*.sh` file found by the same walk. An executable file runs as `./<path>` (honouring its shebang); a file without the executable bit runs as `bash <path>`. Both run from the workspace root and take no arguments. Terminal tabs are named `shell:<path>`.
 

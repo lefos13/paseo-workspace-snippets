@@ -456,6 +456,39 @@ test("does not follow a package.json symlink outside the workspace", async () =>
   });
 });
 
+test("isolates a Root package.json error and still lists the rest", async () => {
+  await withTempDir(async (base) => {
+    const outside = path.join(base, "outside-package.json");
+    await fs.writeFile(outside, packageJson({ scripts: { dev: "outside" } }));
+
+    const directory = path.join(base, "workspace");
+    await fs.mkdir(path.join(directory, "apps", "web"), { recursive: true });
+    await fs.symlink(outside, path.join(directory, "package.json"));
+    await fs.writeFile(
+      path.join(directory, "apps", "web", "package.json"),
+      packageJson({ scripts: { dev: "next dev" } }),
+    );
+    await fs.writeFile(path.join(directory, "keep.sh"), "#!/bin/sh\n");
+
+    const result = await discoverEntries(directory);
+
+    const root = result.packages.find((pkg) => pkg.relDir === "");
+    assert.equal(root?.status, "invalid");
+    assert.match(root?.error ?? "", /PATH_OUTSIDE_WORKSPACE/);
+
+    const web = result.packages.find((pkg) => pkg.relDir === "apps/web");
+    assert.equal(web?.status, "ok");
+    assert.deepEqual(
+      web?.scripts.map((script) => script.name),
+      ["dev"],
+    );
+    assert.deepEqual(
+      result.shellScripts.map((script) => script.path),
+      ["keep.sh"],
+    );
+  });
+});
+
 test("surfaces Nested packages when the Root has no package.json", async () => {
   await withWorkspace(
     { "apps/web/package.json": packageJson({ scripts: { dev: "x" } }) },

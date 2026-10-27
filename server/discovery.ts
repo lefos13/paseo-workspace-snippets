@@ -91,8 +91,8 @@ async function hasRunnableContent(directory: string): Promise<boolean> {
  *
  * Discovers the Root package and every Nested package up to four levels deep,
  * skipping dependency, VCS, build-output and dot-folders. Symlinked
- * directories are not followed. A Nested package that cannot be read becomes
- * an `invalid` Package with its error instead of failing the whole scan.
+ * directories are not followed. A Package that cannot be read, Root included,
+ * becomes an `invalid` Package with its error instead of failing the scan.
  */
 export async function discoverEntries(
   directory: string,
@@ -116,9 +116,8 @@ export async function discoverEntries(
     try {
       detected = await detectPackage(dir, relDir, inheritedPackageManager);
     } catch (err) {
-      // A single broken Package must not hide the others; the Root package's
-      // failures are real workspace failures, so they propagate.
-      if (relDir === "") throw err;
+      // A single unreadable Package must not hide the others, including the
+      // Root package: report it as invalid and keep walking.
       detected = {
         relDir,
         status: "invalid",
