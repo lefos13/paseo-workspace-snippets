@@ -5,6 +5,12 @@ const SKIPPED_DIRECTORY_NAMES: Record<string, true> = {
   dist: true,
   build: true,
   ".next": true,
+  coverage: true,
+  vendor: true,
+  target: true,
+  out: true,
+  venv: true,
+  __pycache__: true,
 };
 
 /** Directory levels below the workspace root that are walked. */

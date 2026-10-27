@@ -28,40 +28,65 @@ async function readDirectory(directory: string) {
 }
 
 /**
- * Adds the `*.sh` files of one directory to the scan. A symlinked file is
- * only included when its real path stays inside the workspace, so a link
- * cannot make the plugin run code from elsewhere. The executable flag comes
- * from the real file's mode; files without it are still listed.
+ * Returns the `*.sh` files of one directory. A symlinked file is only included
+ * when its real path stays inside the workspace, so a link cannot make the
+ * plugin run code from elsewhere. The executable flag comes from the real
+ * file's mode; files without it are still listed.
  */
 async function collectShellScripts(
   root: string,
   dir: string,
   relDir: string,
   entries: Dirent[],
-  shellScripts: ShellScript[],
-): Promise<void> {
-  for (const entry of entries) {
-    if (!entry.name.endsWith(".sh")) continue;
-    if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+): Promise<ShellScript[]> {
+  const candidates = entries.filter(
+    (entry) =>
+      entry.name.endsWith(".sh") &&
+      (entry.isFile() || entry.isSymbolicLink()),
+  );
 
-    try {
-      const realPath = await fs.realpath(path.join(dir, entry.name));
-      if (
-        realPath !== root &&
-        !realPath.startsWith(`${root}${path.sep}`)
-      ) {
-        continue;
+  const scripts = await Promise.all(
+    candidates.map(async (entry): Promise<ShellScript | null> => {
+      try {
+        const realPath = await fs.realpath(path.join(dir, entry.name));
+        if (
+          realPath !== root &&
+          !realPath.startsWith(`${root}${path.sep}`)
+        ) {
+          return null;
+        }
+        const stats = await fs.stat(realPath);
+        if (!stats.isFile()) return null;
+        return {
+          path: relDir ? `${relDir}/${entry.name}` : entry.name,
+          executable: (stats.mode & 0o111) !== 0,
+        };
+      } catch {
+        // Broken symlink or unreadable file: skip it rather than fail the scan.
+        return null;
       }
-      const stats = await fs.stat(realPath);
-      if (!stats.isFile()) continue;
-      shellScripts.push({
-        path: relDir ? `${relDir}/${entry.name}` : entry.name,
-        executable: (stats.mode & 0o111) !== 0,
-      });
-    } catch {
-      // Broken symlink or unreadable file: skip it rather than fail the scan.
-    }
-  }
+    }),
+  );
+
+  return scripts.filter((script): script is ShellScript => script !== null);
+}
+
+interface DirectoryScan {
+  dir: string;
+  relDir: string;
+  entries: Dirent[];
+  shellScripts: ShellScript[];
+}
+
+/** Reads one directory and the Shell scripts directly inside it. */
+async function scanDirectory(
+  root: string,
+  dir: string,
+  relDir: string,
+): Promise<DirectoryScan> {
+  const entries = await readDirectory(dir);
+  const shellScripts = await collectShellScripts(root, dir, relDir, entries);
+  return { dir, relDir, entries, shellScripts };
 }
 
 /**
@@ -96,12 +121,12 @@ export async function discoverEntries(
   let stopped = false;
 
   const walk = async (
-    dir: string,
-    relDir: string,
+    scan: DirectoryScan,
     depth: number,
     inheritedPackageManager: PackageManager,
   ): Promise<void> => {
     if (stopped) return;
+    const { dir, relDir, entries } = scan;
 
     let detected: DetectedPackage;
     try {
@@ -124,8 +149,8 @@ export async function discoverEntries(
       packages.push(detected);
     }
 
-    const entries = await readDirectory(dir);
-    await collectShellScripts(root, dir, relDir, entries, shellScripts);
+    shellScripts.push(...scan.shellScripts);
+
     const childDirectories = entries.filter(
       (entry) =>
         entry.isDirectory() && !isSkippedDirectoryName(entry.name),
@@ -141,18 +166,25 @@ export async function discoverEntries(
       return;
     }
 
-    for (const child of childDirectories) {
+    // Read sibling folders in parallel, then walk them in sorted order so the
+    // Package cap and output stay deterministic.
+    const childScans = await Promise.all(
+      childDirectories.map((child) =>
+        scanDirectory(
+          root,
+          path.join(dir, child.name),
+          relDir ? `${relDir}/${child.name}` : child.name,
+        ),
+      ),
+    );
+
+    for (const childScan of childScans) {
       if (stopped) return;
-      await walk(
-        path.join(dir, child.name),
-        relDir ? `${relDir}/${child.name}` : child.name,
-        depth + 1,
-        detected.packageManager,
-      );
+      await walk(childScan, depth + 1, detected.packageManager);
     }
   };
 
-  await walk(root, "", 0, "npm");
+  await walk(await scanDirectory(root, root, ""), 0, "npm");
   packages.sort((a, b) => {
     if (a.relDir === b.relDir) return 0;
     if (a.relDir === "") return -1;

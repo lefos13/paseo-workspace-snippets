@@ -11,6 +11,35 @@ import {
   withWorkspace,
 } from "./helpers";
 
+test("skips well-known heavy folders", async () => {
+  await withWorkspace(
+    {
+      "package.json": packageJson({ scripts: { dev: "vite" } }),
+      "coverage/package.json": packageJson({ scripts: { dev: "x" } }),
+      "vendor/package.json": packageJson({ scripts: { dev: "x" } }),
+      "target/package.json": packageJson({ scripts: { dev: "x" } }),
+      "out/package.json": packageJson({ scripts: { dev: "x" } }),
+      "venv/package.json": packageJson({ scripts: { dev: "x" } }),
+      "__pycache__/package.json": packageJson({ scripts: { dev: "x" } }),
+      "coverage/cover.sh": "#!/bin/sh\n",
+      "vendor/build.sh": "#!/bin/sh\n",
+      "target/build.sh": "#!/bin/sh\n",
+      "out/build.sh": "#!/bin/sh\n",
+      "venv/bin/activate.sh": "#!/bin/sh\n",
+      "__pycache__/cache.sh": "#!/bin/sh\n",
+    },
+    async (directory) => {
+      const result = await discoverEntries(directory);
+
+      assert.deepEqual(
+        result.packages.map((pkg) => pkg.relDir),
+        [""],
+      );
+      assert.deepEqual(result.shellScripts, []);
+    },
+  );
+});
+
 test("finds the Root package Scripts in declaration order", async () => {
   await withWorkspace(
     {
@@ -172,8 +201,8 @@ test("finds Nested packages at several depths and in submodule-style folders", a
       "package.json": packageJson({ scripts: { dev: "vite" } }),
       "apps/web/package.json": packageJson({ scripts: { dev: "next dev" } }),
       "packages/lib/package.json": packageJson({ scripts: { build: "tsc" } }),
-      "vendor/sub/.git": "gitdir: ../../.git/modules/vendor/sub",
-      "vendor/sub/package.json": packageJson({ scripts: { bootstrap: "make" } }),
+      "modules/sub/.git": "gitdir: ../../.git/modules/modules/sub",
+      "modules/sub/package.json": packageJson({ scripts: { bootstrap: "make" } }),
       "a/b/c/d/package.json": packageJson({ scripts: { deep: "echo deep" } }),
     },
     async (directory) => {
@@ -181,7 +210,7 @@ test("finds Nested packages at several depths and in submodule-style folders", a
 
       assert.deepEqual(
         result.packages.map((pkg) => pkg.relDir),
-        ["", "a/b/c/d", "apps/web", "packages/lib", "vendor/sub"],
+        ["", "a/b/c/d", "apps/web", "modules/sub", "packages/lib"],
       );
       assert.deepEqual(result.shellScripts, []);
       assert.equal(result.truncated, false);
