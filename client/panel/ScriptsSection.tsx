@@ -18,7 +18,6 @@ export interface ScriptsSectionProps {
   openTerminals: Record<string, string>;
   pendingActionEntries: Record<string, boolean>;
   actionsDisabled?: boolean;
-  lastRunKey: string | null;
   entryCanPreview?: (isOpen: boolean) => boolean;
   theme: PluginTheme;
   compact: boolean;
@@ -40,7 +39,6 @@ export function ScriptsSection({
   openTerminals,
   pendingActionEntries,
   actionsDisabled = false,
-  lastRunKey,
   entryCanPreview,
   theme,
   compact,
@@ -116,13 +114,12 @@ export function ScriptsSection({
           ) : null}
 
           {status === "ok" && scripts.length > 0 ? (
-            <View style={styles.list}>
-              {scripts.map((script) => {
+            <View style={styles.entryList}>
+              {scripts.map((script, index) => {
                 const termName = terminalName("script", script.name);
                 const eKey = entryKey("script", script.name);
                 const isOpen = Boolean(openTerminals[termName]);
                 const isActionPending = Boolean(pendingActionEntries[eKey]);
-                const showTabHint = lastRunKey === eKey;
 
                 return (
                   <EntryRow
@@ -131,13 +128,12 @@ export function ScriptsSection({
                     name={script.name}
                     command={script.body}
                     entryKey={eKey}
-                    terminalName={termName}
                     theme={theme}
                     compact={compact}
                     isOpen={isOpen}
                     isActionPending={isActionPending}
                     actionsDisabled={actionsDisabled}
-                    showTabHint={showTabHint}
+                    showDivider={index > 0}
                     canPreview={
                       entryCanPreview ? entryCanPreview(isOpen) : undefined
                     }

@@ -119,7 +119,6 @@ export function SnippetsHome({
   const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
     {},
   );
-  const [lastRunKey, setLastRunKey] = useState<string | null>(null);
 
   const projectSnippets = useMemo(() => {
     if (settings.status !== "ready" || !projectRootPath) return [];
@@ -178,7 +177,6 @@ export function SnippetsHome({
         projectId,
         entryKey: entryKeyString,
       });
-      setLastRunKey(entryKeyString);
       await queryClient.invalidateQueries({
         queryKey: ["projectStates", projectId],
       });
@@ -220,9 +218,6 @@ export function SnippetsHome({
         workspaceId,
         entryKey: entryKeyString,
       });
-      if (lastRunKey === entryKeyString) {
-        setLastRunKey(null);
-      }
       await queryClient.invalidateQueries({
         queryKey: ["projectStates", projectId],
       });
@@ -413,11 +408,6 @@ export function SnippetsHome({
       openTerminals[terminalName("snippet", editingSnippet.name)],
   );
 
-  const lastRunSnippetId =
-    lastRunKey && lastRunKey.startsWith("snippet:")
-      ? lastRunKey.slice("snippet:".length)
-      : null;
-
   const content = (
     <>
       {selectedProject ? (
@@ -531,7 +521,6 @@ export function SnippetsHome({
                 openTerminals={openTerminals}
                 pendingActionEntries={pendingActions}
                 actionsDisabled={actionsDisabled}
-                lastRunKey={lastRunKey}
                 entryCanPreview={(isOpen) => Boolean(workspaceId && isOpen)}
                 theme={theme}
                 compact={layout.compact}
@@ -547,7 +536,6 @@ export function SnippetsHome({
                 openTerminals={openTerminals}
                 pendingActionEntries={pendingActions}
                 actionsDisabled={actionsDisabled}
-                lastRunSnippetId={lastRunSnippetId}
                 entryCanPreview={(isOpen) => Boolean(workspaceId && isOpen)}
                 theme={theme}
                 compact={layout.compact}

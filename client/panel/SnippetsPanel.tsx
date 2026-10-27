@@ -82,7 +82,6 @@ export function SnippetsPanel({
   const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
     {},
   );
-  const [lastRunKey, setLastRunKey] = useState(null as string | null);
 
   const headerTitle = workspace?.name
     ? `Snippets · ${workspace.name}`
@@ -172,7 +171,6 @@ export function SnippetsPanel({
         workspaceId,
         entryKey: key,
       });
-      setLastRunKey(key);
       await queryClient.invalidateQueries({
         queryKey: ["states", workspaceId],
       });
@@ -191,7 +189,6 @@ export function SnippetsPanel({
         workspaceId,
         entryKey: key,
       });
-      setLastRunKey(key);
       await queryClient.invalidateQueries({
         queryKey: ["states", workspaceId],
       });
@@ -228,9 +225,6 @@ export function SnippetsPanel({
         workspaceId,
         entryKey: key,
       });
-      if (lastRunKey === key) {
-        setLastRunKey(null);
-      }
       await queryClient.invalidateQueries({
         queryKey: ["states", workspaceId],
       });
@@ -249,7 +243,6 @@ export function SnippetsPanel({
         workspaceId,
         entryKey: key,
       });
-      setLastRunKey(key);
       await queryClient.invalidateQueries({
         queryKey: ["states", workspaceId],
       });
@@ -268,7 +261,6 @@ export function SnippetsPanel({
         workspaceId,
         entryKey: key,
       });
-      setLastRunKey(key);
       await queryClient.invalidateQueries({
         queryKey: ["states", workspaceId],
       });
@@ -305,9 +297,6 @@ export function SnippetsPanel({
         workspaceId,
         entryKey: key,
       });
-      if (lastRunKey === key) {
-        setLastRunKey(null);
-      }
       await queryClient.invalidateQueries({
         queryKey: ["states", workspaceId],
       });
@@ -517,11 +506,6 @@ export function SnippetsPanel({
       openTerminals[terminalName("snippet", editingSnippet.name)],
   );
 
-  const lastRunSnippetId =
-    lastRunKey && lastRunKey.startsWith("snippet:")
-      ? lastRunKey.slice("snippet:".length)
-      : null;
-
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
       <View style={styles.header}>
@@ -618,7 +602,6 @@ export function SnippetsPanel({
             openTerminals={openTerminals}
             pendingActionEntries={pendingActions}
             actionsDisabled={actionsDisabled}
-            lastRunKey={lastRunKey}
             theme={theme}
             compact={layout.compact}
             onRun={handleRunScript}
@@ -632,7 +615,6 @@ export function SnippetsPanel({
             openTerminals={openTerminals}
             pendingActionEntries={pendingActions}
             actionsDisabled={actionsDisabled}
-            lastRunSnippetId={lastRunSnippetId}
             theme={theme}
             compact={layout.compact}
             onRun={handleRunSnippet}

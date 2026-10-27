@@ -13,7 +13,6 @@ export interface SnippetsSectionProps {
   snippets: Snippet[];
   openTerminals: Record<string, string>;
   pendingActionEntries: Record<string, boolean>;
-  lastRunSnippetId: string | null;
   actionsDisabled?: boolean;
   entryCanPreview?: (isOpen: boolean) => boolean;
   theme: PluginTheme;
@@ -33,7 +32,6 @@ export function SnippetsSection({
   snippets,
   openTerminals,
   pendingActionEntries,
-  lastRunSnippetId,
   actionsDisabled = false,
   entryCanPreview,
   theme,
@@ -71,12 +69,11 @@ export function SnippetsSection({
           </Text>
         </View>
       ) : (
-        <View style={styles.list}>
-          {snippets.map((snippet) => {
+        <View style={styles.entryList}>
+          {snippets.map((snippet, index) => {
             const termName = terminalName("snippet", snippet.name);
             const isOpen = Boolean(openTerminals[termName]);
             const isActionPending = Boolean(pendingActionEntries[snippet.id]);
-            const showTabHint = lastRunSnippetId === snippet.id;
 
             return (
               <EntryRow
@@ -86,13 +83,12 @@ export function SnippetsSection({
                 command={snippet.command}
                 scope={snippet.scope}
                 entryKey={entryKey("snippet", snippet.id)}
-                terminalName={termName}
                 theme={theme}
                 compact={compact}
                 isOpen={isOpen}
                 isActionPending={isActionPending}
                 actionsDisabled={actionsDisabled}
-                showTabHint={showTabHint}
+                showDivider={index > 0}
                 canPreview={
                   entryCanPreview ? entryCanPreview(isOpen) : undefined
                 }
