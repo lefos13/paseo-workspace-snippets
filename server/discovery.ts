@@ -7,21 +7,12 @@ import type {
   PackageManager,
   ShellScript,
 } from "../shared/discovery";
-import { detectPackage } from "./package-json";
-
-/** Folders that never hold the user's own Packages. */
-const SKIPPED_DIRECTORY_NAMES: Record<string, true> = {
-  node_modules: true,
-  ".git": true,
-  dist: true,
-  build: true,
-  ".next": true,
-};
-
-/** Directory levels below the workspace root that are walked. */
-const MAX_DEPTH = 4;
-/** Packages the walk collects before it stops and reports truncation. */
-const MAX_PACKAGES = 50;
+import {
+  isSkippedDirectoryName,
+  MAX_DEPTH,
+  MAX_PACKAGES,
+} from "./discoverable";
+import { detectPackage, invalidPackage } from "./package-json";
 
 /**
  * Reads one directory, sorted by name so the walk order is deterministic.
@@ -118,13 +109,7 @@ export async function discoverEntries(
     } catch (err) {
       // A single unreadable Package must not hide the others, including the
       // Root package: report it as invalid and keep walking.
-      detected = {
-        relDir,
-        status: "invalid",
-        error: err instanceof Error ? err.message : String(err),
-        packageManager: inheritedPackageManager,
-        scripts: [],
-      };
+      detected = invalidPackage(relDir, inheritedPackageManager, err);
     }
 
     if (detected.status !== "missing") {
@@ -143,9 +128,7 @@ export async function discoverEntries(
     await collectShellScripts(root, dir, relDir, entries, shellScripts);
     const childDirectories = entries.filter(
       (entry) =>
-        entry.isDirectory() &&
-        !entry.name.startsWith(".") &&
-        !SKIPPED_DIRECTORY_NAMES[entry.name],
+        entry.isDirectory() && !isSkippedDirectoryName(entry.name),
     );
 
     if (depth === MAX_DEPTH) {

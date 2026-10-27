@@ -15,7 +15,16 @@ import {
 } from "../shared/entries";
 import type { snippetsSettings } from "../shared/settings";
 import { discoverEntries } from "./discovery";
-import { detectPackage, inheritedPackageManager } from "./package-json";
+import {
+  isDiscoverablePackageDir,
+  isDiscoverableShellScriptPath,
+  relativeSegments,
+} from "./discoverable";
+import {
+  detectPackage,
+  inheritedPackageManager,
+  invalidPackage,
+} from "./package-json";
 import type { ResolvedWorkspace } from "./workspace";
 
 export interface ResolvedEntry {
@@ -65,39 +74,60 @@ function entryForShellScript(key: string, script: ShellScript): ResolvedEntry {
 }
 
 /**
- * Resolves a `shell:<relPath>` key by statting only that file. The real path
- * must stay inside the workspace, so a symlink cannot make the plugin run a
- * file from elsewhere.
+ * Walks to an existing Package folder. Returns null when a segment is missing
+ * or is a symlink: the scan never follows symlinked folders, so a key through
+ * one must not resolve.
+ */
+async function resolveExistingDirectory(
+  workspaceRoot: string,
+  segments: string[],
+): Promise<string | null> {
+  let directory = workspaceRoot;
+  for (const segment of segments) {
+    directory = path.join(directory, segment);
+    try {
+      const stats = await fs.lstat(directory);
+      if (!stats.isDirectory()) return null;
+    } catch {
+      return null;
+    }
+  }
+  return directory;
+}
+
+/**
+ * Resolves a `shell:<relPath>` key by statting only that file. The path must
+ * satisfy the scan rules, because a key discovery never lists (another
+ * extension, a skipped folder, too deep) must not run. A symlinked file is
+ * accepted only when its real path stays inside the workspace.
  */
 async function findShellScript(
   workspaceRoot: string,
   relPath: string,
 ): Promise<ShellScript | null> {
-  if (
-    relPath
-      .split("/")
-      .some(
-        (segment) => segment === "" || segment === "." || segment === "..",
-      )
-  ) {
-    return null;
-  }
+  if (!isDiscoverableShellScriptPath(relPath)) return null;
+  const segments = relativeSegments(relPath);
+  if (!segments || segments.length === 0) return null;
 
-  let realPath: string;
-  try {
-    realPath = await fs.realpath(path.join(workspaceRoot, relPath));
-  } catch {
-    return null;
-  }
-  if (
-    realPath !== workspaceRoot &&
-    !realPath.startsWith(`${workspaceRoot}${path.sep}`)
-  ) {
-    return null;
-  }
+  const fileName = segments[segments.length - 1];
+  const directory = await resolveExistingDirectory(
+    workspaceRoot,
+    segments.slice(0, -1),
+  );
+  if (!directory) return null;
 
   try {
-    const stats = await fs.stat(realPath);
+    let stats = await fs.lstat(path.join(directory, fileName));
+    if (stats.isSymbolicLink()) {
+      const realPath = await fs.realpath(path.join(directory, fileName));
+      if (
+        realPath !== workspaceRoot &&
+        !realPath.startsWith(`${workspaceRoot}${path.sep}`)
+      ) {
+        return null;
+      }
+      stats = await fs.stat(realPath);
+    }
     if (!stats.isFile()) return null;
     return { path: relPath, executable: (stats.mode & 0o111) !== 0 };
   } catch {
@@ -108,13 +138,16 @@ async function findShellScript(
 /**
  * Resolves a `script:<identifier>` key without walking the workspace: the key
  * names the Package folder, so only that `package.json` (and its ancestors'
- * Package managers) is read.
+ * Package managers) is read. Folder candidates must satisfy the scan rules, so
+ * a key discovery never lists cannot resolve.
  */
 async function findScriptByIdentifier(
   workspaceRoot: string,
   identifier: string,
 ): Promise<{ root: DetectedPackage; match: FoundScript | null }> {
-  const root = await detectPackage(workspaceRoot, "", "npm");
+  const root = await detectPackage(workspaceRoot, "", "npm").catch((err) =>
+    invalidPackage("", "npm", err),
+  );
   const rootScript = root.scripts.find((script) => script.name === identifier);
   if (root.status === "ok" && rootScript) {
     return { root, match: { package: root, script: rootScript } };
@@ -123,40 +156,22 @@ async function findScriptByIdentifier(
   // Qualified names use `/` between the Package folder and the Script name, so
   // try the longest folder first: `apps/web/dev` beats Script `web/dev` of an
   // `apps` Package.
-  const slashes: number[] = [];
-  for (let index = 0; index < identifier.length; index += 1) {
-    if (identifier[index] === "/") slashes.push(index);
+  const candidates: { relDir: string; scriptName: string }[] = [];
+  for (let index = identifier.length - 1; index >= 0; index -= 1) {
+    if (identifier[index] !== "/") continue;
+    const relDir = identifier.slice(0, index);
+    if (!isDiscoverablePackageDir(relDir)) continue;
+    candidates.push({ relDir, scriptName: identifier.slice(index + 1) });
   }
 
-  for (let index = slashes.length - 1; index >= 0; index -= 1) {
-    const relDir = identifier.slice(0, slashes[index]);
-    const scriptName = identifier.slice(slashes[index] + 1);
-    const segments = relDir.split("/");
-    if (
-      segments.some(
-        (segment) => segment === "" || segment === "." || segment === "..",
-      )
-    ) {
-      continue;
-    }
-
-    let realDir: string;
-    try {
-      realDir = await fs.realpath(path.join(workspaceRoot, relDir));
-    } catch {
-      continue;
-    }
-    // Re-apply the inside-workspace guard: a symlinked Package folder must not
-    // resolve to a Script outside the workspace.
-    if (
-      realDir !== workspaceRoot &&
-      !realDir.startsWith(`${workspaceRoot}${path.sep}`)
-    ) {
-      continue;
-    }
+  for (const { relDir, scriptName } of candidates) {
+    const segments = relativeSegments(relDir);
+    if (!segments) continue;
+    const directory = await resolveExistingDirectory(workspaceRoot, segments);
+    if (!directory) continue;
 
     const detected = await detectPackage(
-      realDir,
+      directory,
       relDir,
       await inheritedPackageManager(workspaceRoot, relDir),
     );

@@ -7,6 +7,24 @@ import type {
 } from "../shared/discovery";
 import { scriptCommand } from "../shared/entries";
 
+/**
+ * Shape for a Package that exists but could not be read: discovery and key
+ * resolution report it instead of failing the whole scan.
+ */
+export function invalidPackage(
+  relDir: string,
+  packageManager: PackageManager,
+  error: unknown,
+): DetectedPackage {
+  return {
+    relDir,
+    status: "invalid",
+    error: error instanceof Error ? error.message : String(error),
+    packageManager,
+    scripts: [],
+  };
+}
+
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await fs.access(filePath);

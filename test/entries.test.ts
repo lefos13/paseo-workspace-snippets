@@ -543,6 +543,102 @@ test("does not resolve a Shell script symlinked outside the workspace", async ()
   });
 });
 
+test("does not resolve a Shell script whose path discovery skips", async () => {
+  await withWorkspace(
+    {
+      "README.md": "# readme",
+      "node_modules/.bin/tool.sh": "#!/bin/sh\n",
+      ".cache/hidden.sh": "#!/bin/sh\n",
+      "dist/build.sh": "#!/bin/sh\n",
+      "a/b/c/d/e/deep.sh": "#!/bin/sh\n",
+    },
+    async (directory) => {
+      for (const key of [
+        "shell:README.md",
+        "shell:node_modules/.bin/tool.sh",
+        "shell:.cache/hidden.sh",
+        "shell:dist/build.sh",
+        "shell:a/b/c/d/e/deep.sh",
+      ]) {
+        await assert.rejects(
+          resolveEntry(fakeSettings(), key, {
+            directory,
+            projectRootPath: directory,
+          }),
+          /ENTRY_NOT_FOUND: Shell script .* not found/,
+          key,
+        );
+      }
+    },
+  );
+});
+
+test("does not resolve a Script in a folder discovery skips", async () => {
+  await withWorkspace(
+    {
+      "package.json": packageJson({ scripts: { dev: "echo root" } }),
+      "node_modules/pkg/package.json": packageJson({
+        scripts: { dev: "echo dep" },
+      }),
+      ".cache/pkg/package.json": packageJson({ scripts: { dev: "echo cache" } }),
+      "dist/pkg/package.json": packageJson({ scripts: { dev: "echo dist" } }),
+      "a/b/c/d/e/package.json": packageJson({ scripts: { dev: "echo deep" } }),
+    },
+    async (directory) => {
+      for (const key of [
+        "script:node_modules/pkg/dev",
+        "script:.cache/pkg/dev",
+        "script:dist/pkg/dev",
+        "script:a/b/c/d/e/dev",
+      ]) {
+        await assert.rejects(
+          resolveEntry(fakeSettings(), key, {
+            directory,
+            projectRootPath: directory,
+          }),
+          /ENTRY_NOT_FOUND: Script .* not found/,
+          key,
+        );
+      }
+    },
+  );
+});
+
+test("does not resolve entries through a symlinked folder inside the workspace", async () => {
+  await withTempDir(async (base) => {
+    const directory = path.join(base, "workspace");
+    await fs.mkdir(path.join(directory, "apps", "web"), { recursive: true });
+    await fs.mkdir(path.join(directory, "scripts"), { recursive: true });
+    await fs.writeFile(
+      path.join(directory, "package.json"),
+      packageJson({ scripts: {} }),
+    );
+    await fs.writeFile(
+      path.join(directory, "apps", "web", "package.json"),
+      packageJson({ scripts: { dev: "echo web" } }),
+    );
+    await fs.writeFile(
+      path.join(directory, "scripts", "deploy.sh"),
+      "#!/bin/sh\n",
+    );
+    await fs.symlink("web", path.join(directory, "apps", "link"));
+    await fs.symlink("scripts", path.join(directory, "scripts-link"));
+
+    const paths = { directory, projectRootPath: directory };
+    const entry = await resolveEntry(fakeSettings(), "script:apps/web/dev", paths);
+    assert.equal(entry.command, "(cd apps/web && npm run dev)");
+
+    await assert.rejects(
+      resolveEntry(fakeSettings(), "script:apps/link/dev", paths),
+      /ENTRY_NOT_FOUND/,
+    );
+    await assert.rejects(
+      resolveEntry(fakeSettings(), "shell:scripts-link/deploy.sh", paths),
+      /ENTRY_NOT_FOUND/,
+    );
+  });
+});
+
 test("resolves a Shell script by its relative path", async () => {
   await withWorkspace(
     {

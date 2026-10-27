@@ -93,6 +93,8 @@ Packages without Scripts are hidden, and a broken `package.json` (Root included)
 
 Shell scripts are every `*.sh` file found by the same walk. An executable file runs as `./<path>` (honouring its shebang); a file without the executable bit runs as `bash <path>`. Both run from the workspace root and take no arguments. Terminal tabs are named `shell:<path>`.
 
+Keys are only accepted for what the scan lists: a `script:` key must name a Package folder the walk visits, and a `shell:` key a `*.sh` file in one. A key for a skipped folder (for example `node_modules`), a symlinked folder, a non-`.sh` file, or a path below the depth limit fails with `ENTRY_NOT_FOUND`.
+
 ### Qualified Names and Commands
 
 A Root package Script keeps its bare name (`dev`, terminal tab `script:dev`). A Nested package Script uses `<folder>/<name>` (for example `apps/web/dev`, terminal tab `script:apps/web/dev`), so two Packages can both have a `dev` Script. Nested Scripts run as `(cd <folder> && <pm> run <name>)`; Root Scripts run as `<pm> run <name>`.
