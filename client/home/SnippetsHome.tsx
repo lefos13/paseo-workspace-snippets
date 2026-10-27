@@ -28,6 +28,7 @@ import { ScriptsSection } from "../panel/ScriptsSection";
 import { ShellScriptsSection } from "../panel/ShellScriptsSection";
 import { SnippetEditor } from "../panel/SnippetEditor";
 import { SnippetsSection } from "../panel/SnippetsSection";
+import { useEntryActions } from "../panel/entryActions";
 import { makeStyles } from "../panel/styles";
 import { ProjectList, shortenPath } from "./ProjectList";
 import type { ProjectDescriptor } from "./ProjectList";
@@ -117,10 +118,6 @@ export function SnippetsHome({
   const [capturedValues, setCapturedValues] =
     useState<SnippetsSettingsValues | null>(null);
 
-  const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
-    {},
-  );
-
   const projectSnippets = useMemo(() => {
     if (settings.status !== "ready" || !projectRootPath) return [];
     return settings.values.projects?.[projectRootPath] ?? [];
@@ -178,127 +175,32 @@ export function SnippetsHome({
     await settings.save(nextValues, settings.revision);
   };
 
-  const handleRunOrRestart = async (
-    entryKeyString: string,
-    idForPending: string,
-  ) => {
-    if (!projectId) return;
-    setPendingActions((prev) => ({ ...prev, [idForPending]: true }));
-    try {
-      const result = await runProjectEntry({
-        projectId,
-        entryKey: entryKeyString,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["projectStates", projectId],
-      });
+  const entryActions = useEntryActions({
+    run: async (key) => {
+      if (!projectId) return;
+      const result = await runProjectEntry({ projectId, entryKey: key });
       if (navigation?.openWorkspace) {
         navigation.openWorkspace({ workspaceId: result.workspaceId });
       } else {
         toast.show("Started in workspace", { variant: "info" });
       }
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [idForPending]: false }));
-    }
-  };
-
-  const handleStop = async (entryKeyString: string, idForPending: string) => {
-    if (!workspaceId || !projectId) return;
-    setPendingActions((prev) => ({ ...prev, [idForPending]: true }));
-    try {
-      await stopEntry({
-        workspaceId,
-        entryKey: entryKeyString,
-      });
+    },
+    stop: async (key) => {
+      if (!workspaceId || !projectId) return;
+      await stopEntry({ workspaceId, entryKey: key });
+    },
+    close: async (key) => {
+      if (!workspaceId || !projectId) return;
+      await closeEntry({ workspaceId, entryKey: key });
+    },
+    refresh: async () => {
+      if (!projectId) return;
       await queryClient.invalidateQueries({
         queryKey: ["projectStates", projectId],
       });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [idForPending]: false }));
-    }
-  };
-
-  const handleClose = async (entryKeyString: string, idForPending: string) => {
-    if (!workspaceId || !projectId) return;
-    setPendingActions((prev) => ({ ...prev, [idForPending]: true }));
-    try {
-      await closeEntry({
-        workspaceId,
-        entryKey: entryKeyString,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["projectStates", projectId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [idForPending]: false }));
-    }
-  };
-
-  const handleRunScript = (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    return handleRunOrRestart(key, key);
-  };
-
-  const handleRestartScript = (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    return handleRunOrRestart(key, key);
-  };
-
-  const handleStopScript = (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    return handleStop(key, key);
-  };
-
-  const handleCloseScript = (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    return handleClose(key, key);
-  };
-
-  const handleRunShellScript = (relPath: string) => {
-    const key = entryKey("shell", relPath);
-    return handleRunOrRestart(key, key);
-  };
-
-  const handleRestartShellScript = (relPath: string) => {
-    const key = entryKey("shell", relPath);
-    return handleRunOrRestart(key, key);
-  };
-
-  const handleStopShellScript = (relPath: string) => {
-    const key = entryKey("shell", relPath);
-    return handleStop(key, key);
-  };
-
-  const handleCloseShellScript = (relPath: string) => {
-    const key = entryKey("shell", relPath);
-    return handleClose(key, key);
-  };
-
-  const handleRunSnippet = (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    return handleRunOrRestart(key, snippet.id);
-  };
-
-  const handleRestartSnippet = (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    return handleRunOrRestart(key, snippet.id);
-  };
-
-  const handleStopSnippet = (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    return handleStop(key, snippet.id);
-  };
-
-  const handleCloseSnippet = (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    return handleClose(key, snippet.id);
-  };
+    },
+    onError: (error) => toast.error(mapErrorMessage(error)),
+  });
 
   const handleOpenAdd = () => {
     if (settings.status !== "ready") return;
@@ -551,15 +453,15 @@ export function SnippetsHome({
                 showScripts={showScripts}
                 onToggleShowScripts={handleToggleShowScripts}
                 openTerminals={openTerminals}
-                pendingActionEntries={pendingActions}
+                pendingActionEntries={entryActions.pendingActionEntries}
                 actionsDisabled={actionsDisabled}
                 entryCanPreview={(isOpen) => Boolean(workspaceId && isOpen)}
                 theme={theme}
                 compact={layout.compact}
-                onRun={handleRunScript}
-                onRestart={handleRestartScript}
-                onStop={handleStopScript}
-                onClose={handleCloseScript}
+                onRun={entryActions.run}
+                onRestart={entryActions.restart}
+                onStop={entryActions.stop}
+                onClose={entryActions.close}
               />
               <ShellScriptsSection
                 workspaceId={workspaceId}
@@ -570,30 +472,30 @@ export function SnippetsHome({
                 showShellScripts={showShellScripts}
                 onToggleShowShellScripts={handleToggleShowShellScripts}
                 openTerminals={openTerminals}
-                pendingActionEntries={pendingActions}
+                pendingActionEntries={entryActions.pendingActionEntries}
                 actionsDisabled={actionsDisabled}
                 entryCanPreview={(isOpen) => Boolean(workspaceId && isOpen)}
                 theme={theme}
                 compact={layout.compact}
-                onRun={handleRunShellScript}
-                onRestart={handleRestartShellScript}
-                onStop={handleStopShellScript}
-                onClose={handleCloseShellScript}
+                onRun={entryActions.run}
+                onRestart={entryActions.restart}
+                onStop={entryActions.stop}
+                onClose={entryActions.close}
               />
               <SnippetsSection
                 title="Project snippets"
                 workspaceId={workspaceId}
                 snippets={projectSnippets}
                 openTerminals={openTerminals}
-                pendingActionEntries={pendingActions}
+                pendingActionEntries={entryActions.pendingActionEntries}
                 actionsDisabled={actionsDisabled}
                 entryCanPreview={(isOpen) => Boolean(workspaceId && isOpen)}
                 theme={theme}
                 compact={layout.compact}
-                onRun={handleRunSnippet}
-                onRestart={handleRestartSnippet}
-                onStop={handleStopSnippet}
-                onClose={handleCloseSnippet}
+                onRun={entryActions.run}
+                onRestart={entryActions.restart}
+                onStop={entryActions.stop}
+                onClose={entryActions.close}
                 onAdd={handleOpenAdd}
                 onEdit={handleOpenEdit}
                 onDelete={handleOpenDelete}

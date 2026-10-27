@@ -27,10 +27,10 @@ export interface ShellScriptsSectionProps {
   entryCanPreview?: (isOpen: boolean) => boolean;
   theme: PluginTheme;
   compact: boolean;
-  onRun: (relPath: string) => void;
-  onRestart: (relPath: string) => void;
-  onStop: (relPath: string) => void;
-  onClose: (relPath: string) => void;
+  onRun: (entryKey: string) => void;
+  onRestart: (entryKey: string) => void;
+  onStop: (entryKey: string) => void;
+  onClose: (entryKey: string) => void;
 }
 
 export function ShellScriptsSection({
@@ -174,10 +174,10 @@ export function ShellScriptsSection({
                                   ? entryCanPreview(isOpen)
                                   : undefined
                               }
-                              onRun={() => onRun(script.path)}
-                              onRestart={() => onRestart(script.path)}
-                              onStop={() => onStop(script.path)}
-                              onClose={() => onClose(script.path)}
+                              onRun={() => onRun(eKey)}
+                              onRestart={() => onRestart(eKey)}
+                              onStop={() => onStop(eKey)}
+                              onClose={() => onClose(eKey)}
                             />
                           );
                         })}

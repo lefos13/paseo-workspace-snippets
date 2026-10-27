@@ -28,10 +28,10 @@ export interface ScriptsSectionProps {
   entryCanPreview?: (isOpen: boolean) => boolean;
   theme: PluginTheme;
   compact: boolean;
-  onRun: (qualifiedName: string) => void;
-  onRestart: (qualifiedName: string) => void;
-  onStop: (qualifiedName: string) => void;
-  onClose: (qualifiedName: string) => void;
+  onRun: (entryKey: string) => void;
+  onRestart: (entryKey: string) => void;
+  onStop: (entryKey: string) => void;
+  onClose: (entryKey: string) => void;
 }
 
 export function ScriptsSection({
@@ -175,10 +175,10 @@ export function ScriptsSection({
                                   ? entryCanPreview(isOpen)
                                   : undefined
                               }
-                              onRun={() => onRun(qualified)}
-                              onRestart={() => onRestart(qualified)}
-                              onStop={() => onStop(qualified)}
-                              onClose={() => onClose(qualified)}
+                              onRun={() => onRun(eKey)}
+                              onRestart={() => onRestart(eKey)}
+                              onStop={() => onStop(eKey)}
+                              onClose={() => onClose(eKey)}
                             />
                           );
                         })}

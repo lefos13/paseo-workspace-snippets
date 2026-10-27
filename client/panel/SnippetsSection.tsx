@@ -17,10 +17,10 @@ export interface SnippetsSectionProps {
   entryCanPreview?: (isOpen: boolean) => boolean;
   theme: PluginTheme;
   compact: boolean;
-  onRun: (snippet: Snippet) => void;
-  onRestart: (snippet: Snippet) => void;
-  onStop: (snippet: Snippet) => void;
-  onClose: (snippet: Snippet) => void;
+  onRun: (entryKey: string) => void;
+  onRestart: (entryKey: string) => void;
+  onStop: (entryKey: string) => void;
+  onClose: (entryKey: string) => void;
   onAdd: () => void;
   onEdit: (snippet: Snippet) => void;
   onDelete: (snippet: Snippet) => void;
@@ -73,7 +73,8 @@ export function SnippetsSection({
           {snippets.map((snippet, index) => {
             const termName = terminalName("snippet", snippet.name);
             const isOpen = Boolean(openTerminals[termName]);
-            const isActionPending = Boolean(pendingActionEntries[snippet.id]);
+            const key = entryKey("snippet", snippet.id);
+            const isActionPending = Boolean(pendingActionEntries[key]);
 
             return (
               <EntryRow
@@ -82,7 +83,7 @@ export function SnippetsSection({
                 name={snippet.name}
                 command={snippet.command}
                 scope={snippet.scope}
-                entryKey={entryKey("snippet", snippet.id)}
+                entryKey={key}
                 theme={theme}
                 compact={compact}
                 isOpen={isOpen}
@@ -92,10 +93,10 @@ export function SnippetsSection({
                 canPreview={
                   entryCanPreview ? entryCanPreview(isOpen) : undefined
                 }
-                onRun={() => onRun(snippet)}
-                onRestart={() => onRestart(snippet)}
-                onStop={() => onStop(snippet)}
-                onClose={() => onClose(snippet)}
+                onRun={() => onRun(key)}
+                onRestart={() => onRestart(key)}
+                onStop={() => onStop(key)}
+                onClose={() => onClose(key)}
                 onEdit={() => onEdit(snippet)}
                 onDelete={() => onDelete(snippet)}
               />

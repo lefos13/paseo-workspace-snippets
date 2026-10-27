@@ -28,6 +28,7 @@ import { ScriptsSection } from "./ScriptsSection";
 import { ShellScriptsSection } from "./ShellScriptsSection";
 import { SnippetEditor } from "./SnippetEditor";
 import { SnippetsSection } from "./SnippetsSection";
+import { useEntryActions } from "./entryActions";
 import { makeStyles } from "./styles";
 
 export function SnippetsPanel({
@@ -78,10 +79,6 @@ export function SnippetsPanel({
   );
   const [capturedValues, setCapturedValues] = useState(
     null as SnippetsSettingsValues | null,
-  );
-
-  const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
-    {},
   );
 
   const headerTitle = workspace?.name
@@ -173,221 +170,17 @@ export function SnippetsPanel({
     setEditorOpen(true);
   };
 
-  const handleRunSnippet = async (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    setPendingActions((prev) => ({ ...prev, [snippet.id]: true }));
-    try {
-      await runEntry({
-        workspaceId,
-        entryKey: key,
-      });
+  const entryActions = useEntryActions({
+    run: (key) => runEntry({ workspaceId, entryKey: key }),
+    stop: (key) => stopEntry({ workspaceId, entryKey: key }),
+    close: (key) => closeEntry({ workspaceId, entryKey: key }),
+    refresh: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["states", workspaceId],
       });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [snippet.id]: false }));
-    }
-  };
-
-  const handleRestartSnippet = async (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    setPendingActions((prev) => ({ ...prev, [snippet.id]: true }));
-    try {
-      await runEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [snippet.id]: false }));
-    }
-  };
-
-  const handleStopSnippet = async (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    setPendingActions((prev) => ({ ...prev, [snippet.id]: true }));
-    try {
-      await stopEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [snippet.id]: false }));
-    }
-  };
-
-  const handleCloseSnippet = async (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    setPendingActions((prev) => ({ ...prev, [snippet.id]: true }));
-    try {
-      await closeEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [snippet.id]: false }));
-    }
-  };
-
-  const handleRunScript = async (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    setPendingActions((prev) => ({ ...prev, [key]: true }));
-    try {
-      await runEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleRestartScript = async (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    setPendingActions((prev) => ({ ...prev, [key]: true }));
-    try {
-      await runEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleStopScript = async (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    setPendingActions((prev) => ({ ...prev, [key]: true }));
-    try {
-      await stopEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleCloseScript = async (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    setPendingActions((prev) => ({ ...prev, [key]: true }));
-    try {
-      await closeEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleRunShellScript = async (relPath: string) => {
-    const key = entryKey("shell", relPath);
-    setPendingActions((prev) => ({ ...prev, [key]: true }));
-    try {
-      await runEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleRestartShellScript = async (relPath: string) => {
-    const key = entryKey("shell", relPath);
-    setPendingActions((prev) => ({ ...prev, [key]: true }));
-    try {
-      await runEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleStopShellScript = async (relPath: string) => {
-    const key = entryKey("shell", relPath);
-    setPendingActions((prev) => ({ ...prev, [key]: true }));
-    try {
-      await stopEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const handleCloseShellScript = async (relPath: string) => {
-    const key = entryKey("shell", relPath);
-    setPendingActions((prev) => ({ ...prev, [key]: true }));
-    try {
-      await closeEntry({
-        workspaceId,
-        entryKey: key,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: ["states", workspaceId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [key]: false }));
-    }
-  };
+    },
+    onError: (error) => toast.error(mapErrorMessage(error)),
+  });
 
   const handleSaveSnippet = async (
     itemToSave: Snippet,
@@ -682,14 +475,14 @@ export function SnippetsPanel({
             showScripts={showScripts}
             onToggleShowScripts={handleToggleShowScripts}
             openTerminals={openTerminals}
-            pendingActionEntries={pendingActions}
+            pendingActionEntries={entryActions.pendingActionEntries}
             actionsDisabled={actionsDisabled}
             theme={theme}
             compact={layout.compact}
-            onRun={handleRunScript}
-            onRestart={handleRestartScript}
-            onStop={handleStopScript}
-            onClose={handleCloseScript}
+            onRun={entryActions.run}
+            onRestart={entryActions.restart}
+            onStop={entryActions.stop}
+            onClose={entryActions.close}
           />
           <ShellScriptsSection
             workspaceId={workspaceId}
@@ -700,27 +493,27 @@ export function SnippetsPanel({
             showShellScripts={showShellScripts}
             onToggleShowShellScripts={handleToggleShowShellScripts}
             openTerminals={openTerminals}
-            pendingActionEntries={pendingActions}
+            pendingActionEntries={entryActions.pendingActionEntries}
             actionsDisabled={actionsDisabled}
             theme={theme}
             compact={layout.compact}
-            onRun={handleRunShellScript}
-            onRestart={handleRestartShellScript}
-            onStop={handleStopShellScript}
-            onClose={handleCloseShellScript}
+            onRun={entryActions.run}
+            onRestart={entryActions.restart}
+            onStop={entryActions.stop}
+            onClose={entryActions.close}
           />
           <SnippetsSection
             workspaceId={workspaceId}
             snippets={allSnippets}
             openTerminals={openTerminals}
-            pendingActionEntries={pendingActions}
+            pendingActionEntries={entryActions.pendingActionEntries}
             actionsDisabled={actionsDisabled}
             theme={theme}
             compact={layout.compact}
-            onRun={handleRunSnippet}
-            onRestart={handleRestartSnippet}
-            onStop={handleStopSnippet}
-            onClose={handleCloseSnippet}
+            onRun={entryActions.run}
+            onRestart={entryActions.restart}
+            onStop={entryActions.stop}
+            onClose={entryActions.close}
             onAdd={handleOpenAdd}
             onEdit={handleOpenEdit}
             onDelete={handleOpenDelete}
