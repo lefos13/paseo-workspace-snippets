@@ -166,6 +166,43 @@ test("matches a unique case-insensitive prefix", async () => {
   );
 });
 
+test("prefers an exact Nested short name over a longer prefix match", async () => {
+  await withWorkspace(
+    {
+      "package.json": packageJson({ scripts: { develop: "vite" } }),
+      "apps/web/package.json": packageJson({ scripts: { dev: "next dev" } }),
+    },
+    async (directory) => {
+      const entry = await resolveEntryByName(fakeSettings(), "dev", {
+        directory,
+        projectRootPath: directory,
+      });
+
+      assert.equal(entry.key, "script:apps/web/dev");
+      assert.equal(entry.command, "(cd apps/web && npm run dev)");
+    },
+  );
+});
+
+test("reports ambiguity when several Nested Scripts exactly share the short name", async () => {
+  await withWorkspace(
+    {
+      "package.json": packageJson({ scripts: { develop: "vite" } }),
+      "apps/api/package.json": packageJson({ scripts: { dev: "a" } }),
+      "apps/web/package.json": packageJson({ scripts: { dev: "b" } }),
+    },
+    async (directory) => {
+      await assert.rejects(
+        resolveEntryByName(fakeSettings(), "dev", {
+          directory,
+          projectRootPath: directory,
+        }),
+        /AMBIGUOUS_NAME: "dev" matches apps\/api\/dev, apps\/web\/dev/,
+      );
+    },
+  );
+});
+
 test("reports ambiguity when a prefix matches several entries", async () => {
   await withWorkspace(
     {

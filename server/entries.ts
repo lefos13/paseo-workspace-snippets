@@ -351,7 +351,9 @@ export async function resolveEntryByName(
   if (exactQualified) return exactQualified.entry;
 
   // 5. Case-insensitive unique match: prefix across Snippets and Scripts,
-  // equality on Shell script paths and basenames.
+  // equality on Shell script paths and basenames. An exact name beats
+  // prefix-only matches, so Root `develop` does not make `/snippet dev`
+  // ambiguous when one Nested Script is literally `dev`.
   const lower = name.toLowerCase();
   const matched: NameCandidate[] = [];
   const matchedKeys = new Set<string>();
@@ -396,9 +398,16 @@ export async function resolveEntryByName(
     }
   }
 
-  if (matched.length === 1) return matched[0].entry;
+  const exactMatches = matched.filter((candidate) =>
+    candidate.names.some(
+      (candidateName) => candidateName.toLowerCase() === lower,
+    ),
+  );
+  const finalists = exactMatches.length > 0 ? exactMatches : matched;
 
-  if (matched.length === 0) {
+  if (finalists.length === 1) return finalists[0].entry;
+
+  if (finalists.length === 0) {
     const availableNames = [
       ...snippets.map((s) => s.name),
       ...rootCandidates.map((c) => c.displayName),
@@ -412,6 +421,6 @@ export async function resolveEntryByName(
     );
   }
 
-  const matchNames = matched.map((c) => c.displayName).join(", ");
+  const matchNames = finalists.map((c) => c.displayName).join(", ");
   throw new Error(`AMBIGUOUS_NAME: "${name}" matches ${matchNames}`);
 }

@@ -74,7 +74,7 @@ In any workspace composer or agent prompt:
   2. Exact Root package Script name.
   3. Exact Shell script relative path.
   4. Exact Qualified name (for example `apps/web/dev`).
-  5. A unique case-insensitive match: Snippets and Scripts by prefix on their name or Qualified name; Shell scripts by exact full path, or exact basename with or without `.sh` (so `deploy` runs `scripts/deploy.sh`).
+  5. A unique case-insensitive match: an exact name first (so a Nested Script literally named `dev` wins over Root `develop`), otherwise Snippets and Scripts by prefix on their name or Qualified name, and Shell scripts by exact full path or exact basename with or without `.sh` (so `deploy` runs `scripts/deploy.sh`).
 
   If nothing matches, or several entries do, the candidates are listed.
 - `/snippet`: Opens the Snippets workspace panel.
