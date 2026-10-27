@@ -74,6 +74,19 @@ async function collectShellScripts(
 }
 
 /**
+ * Whether a folder kept out by the depth limit directly holds a Package or
+ * Shell script. Plain source folders at the limit are not worth a warning.
+ */
+async function hasRunnableContent(directory: string): Promise<boolean> {
+  const entries = await readDirectory(directory);
+  return entries.some(
+    (entry) =>
+      (entry.name === "package.json" || entry.name.endsWith(".sh")) &&
+      (entry.isFile() || entry.isSymbolicLink()),
+  );
+}
+
+/**
  * Reads everything runnable from a workspace directory.
  *
  * Discovers the Root package and every Nested package up to four levels deep,
@@ -137,7 +150,12 @@ export async function discoverEntries(
     );
 
     if (depth === MAX_DEPTH) {
-      if (childDirectories.length > 0) truncated = true;
+      const deeper = await Promise.all(
+        childDirectories.map((child) =>
+          hasRunnableContent(path.join(dir, child.name)),
+        ),
+      );
+      if (deeper.some(Boolean)) truncated = true;
       return;
     }
 

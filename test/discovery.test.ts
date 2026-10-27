@@ -242,6 +242,21 @@ test("stops at depth 4 and reports the scan as truncated", async () => {
   );
 });
 
+test("does not report truncation for plain folders at the depth limit", async () => {
+  await withWorkspace(
+    {
+      "package.json": packageJson({ scripts: { dev: "vite" } }),
+      "src/components/ui/buttons/button.tsx": "export {}",
+      "src/components/ui/buttons/icons/icon.tsx": "export {}",
+    },
+    async (directory) => {
+      const result = await discoverEntries(directory);
+
+      assert.equal(result.truncated, false);
+    },
+  );
+});
+
 test("does not report truncation when the walk covers every folder", async () => {
   await withWorkspace(
     {
