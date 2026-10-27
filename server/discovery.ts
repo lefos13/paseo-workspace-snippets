@@ -1,11 +1,12 @@
 import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import type {
-  DetectedPackage,
-  DiscoveryResult,
-  PackageManager,
-  ShellScript,
+import {
+  compareRelDirs,
+  type DetectedPackage,
+  type DiscoveryResult,
+  type PackageManager,
+  type ShellScript,
 } from "../shared/discovery";
 import {
   isSkippedDirectoryName,
@@ -193,12 +194,7 @@ export async function discoverEntries(
   };
 
   await walk(await scanDirectory(root, root, ""), 0, "npm");
-  packages.sort((a, b) => {
-    if (a.relDir === b.relDir) return 0;
-    if (a.relDir === "") return -1;
-    if (b.relDir === "") return 1;
-    return a.relDir < b.relDir ? -1 : 1;
-  });
+  packages.sort((a, b) => compareRelDirs(a.relDir, b.relDir));
   shellScripts.sort((a, b) => (a.path < b.path ? -1 : 1));
 
   return {

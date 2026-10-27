@@ -8,6 +8,7 @@ import {
   qualifiedScriptName,
   terminalName,
 } from "../../shared/entries";
+import { EntryGroup } from "./EntryGroup";
 import { EntryRow } from "./EntryRow";
 import { usePackageGroupCollapse } from "./packageCollapse";
 import { makeStyles } from "./styles";
@@ -109,43 +110,31 @@ export function ScriptsSection({
           {!loadError
             ? visiblePackages.map((pkg) => {
                 const groupLabel = pkg.relDir || "root";
-                const collapsed = isCollapsed(pkg.relDir);
 
                 return (
-                  <View key={pkg.relDir || "."} style={styles.packageGroup}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded: !collapsed }}
-                      accessibilityLabel={`${
-                        collapsed ? "Expand" : "Collapse"
-                      } ${groupLabel} scripts`}
-                      style={styles.packageGroupHeaderRow}
-                      onPress={() => toggle(pkg.relDir)}
-                    >
-                      <Icon
-                        name={collapsed ? "ChevronRight" : "ChevronDown"}
-                        size={14}
-                        color={theme.colors.foregroundMuted}
-                      />
-                      <Text style={styles.packageGroupHeader}>
-                        {groupLabel} · {pkg.packageManager}
-                      </Text>
-                    </Pressable>
-
-                    {pkg.status === "invalid" ? (
-                      <View style={styles.stateBannerError}>
-                        <Text style={styles.stateBannerTitle}>
-                          Invalid package.json
-                        </Text>
-                        <Text style={styles.stateBannerTextDanger}>
-                          {pkg.error ?? "Failed to parse package.json"}
-                        </Text>
-                      </View>
-                    ) : null}
-
-                    {!collapsed && pkg.scripts.length > 0 ? (
-                      <View style={styles.entryList}>
-                        {pkg.scripts.map((script, index) => {
+                  <EntryGroup
+                    key={pkg.relDir || "."}
+                    label={`${groupLabel} · ${pkg.packageManager}`}
+                    kind="scripts"
+                    collapsed={isCollapsed(pkg.relDir)}
+                    onToggle={() => toggle(pkg.relDir)}
+                    notice={
+                      pkg.status === "invalid" ? (
+                        <View style={styles.stateBannerError}>
+                          <Text style={styles.stateBannerTitle}>
+                            Invalid package.json
+                          </Text>
+                          <Text style={styles.stateBannerTextDanger}>
+                            {pkg.error ?? "Failed to parse package.json"}
+                          </Text>
+                        </View>
+                      ) : null
+                    }
+                    theme={theme}
+                    compact={compact}
+                  >
+                    {pkg.scripts.length > 0
+                      ? pkg.scripts.map((script, index) => {
                           const qualified = qualifiedScriptName(
                             pkg.relDir,
                             script.name,
@@ -181,10 +170,9 @@ export function ScriptsSection({
                               onClose={() => onClose(eKey)}
                             />
                           );
-                        })}
-                      </View>
-                    ) : null}
-                  </View>
+                        })
+                      : null}
+                  </EntryGroup>
                 );
               })
             : null}

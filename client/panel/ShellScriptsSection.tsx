@@ -3,11 +3,13 @@ import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { ShellScript } from "../../shared/discovery";
+import { compareRelDirs } from "../../shared/discovery";
 import {
   entryKey,
   shellScriptCommand,
   terminalName,
 } from "../../shared/entries";
+import { EntryGroup } from "./EntryGroup";
 import { EntryRow } from "./EntryRow";
 import { usePackageGroupCollapse } from "./packageCollapse";
 import { makeStyles } from "./styles";
@@ -69,12 +71,7 @@ export function ShellScriptsSection({
       list.push(script);
       byFolder.set(folder, list);
     }
-    return [...byFolder.entries()].sort(([a], [b]) => {
-      if (a === b) return 0;
-      if (a === "") return -1;
-      if (b === "") return 1;
-      return a < b ? -1 : 1;
-    });
+    return [...byFolder.entries()].sort(([a], [b]) => compareRelDirs(a, b));
   }, [shellScripts]);
 
   return (
@@ -118,74 +115,54 @@ export function ShellScriptsSection({
           ) : null}
 
           {!loadError
-            ? groups.map(([folder, scripts]) => {
-                const groupLabel = folder || "root";
-                const collapsed = isCollapsed(folder);
+            ? groups.map(([folder, scripts]) => (
+                <EntryGroup
+                  key={folder || "."}
+                  label={folder || "root"}
+                  kind="shell scripts"
+                  collapsed={isCollapsed(folder)}
+                  onToggle={() => toggle(folder)}
+                  theme={theme}
+                  compact={compact}
+                >
+                  {scripts.map((script, index) => {
+                    const termName = terminalName("shell", script.path);
+                    const eKey = entryKey("shell", script.path);
+                    const isOpen = Boolean(openTerminals[termName]);
+                    const isActionPending = Boolean(pendingActionEntries[eKey]);
 
-                return (
-                  <View key={folder || "."} style={styles.packageGroup}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded: !collapsed }}
-                      accessibilityLabel={`${
-                        collapsed ? "Expand" : "Collapse"
-                      } ${groupLabel} shell scripts`}
-                      style={styles.packageGroupHeaderRow}
-                      onPress={() => toggle(folder)}
-                    >
-                      <Icon
-                        name={collapsed ? "ChevronRight" : "ChevronDown"}
-                        size={14}
-                        color={theme.colors.foregroundMuted}
+                    return (
+                      <EntryRow
+                        key={script.path}
+                        workspaceId={workspaceId}
+                        name={script.path.slice(
+                          script.path.lastIndexOf("/") + 1,
+                        )}
+                        command={shellScriptCommand(
+                          script.path,
+                          script.executable,
+                        )}
+                        entryKey={eKey}
+                        theme={theme}
+                        compact={compact}
+                        isOpen={isOpen}
+                        isActionPending={isActionPending}
+                        actionsDisabled={actionsDisabled}
+                        showDivider={index > 0}
+                        canPreview={
+                          entryCanPreview
+                            ? entryCanPreview(isOpen)
+                            : undefined
+                        }
+                        onRun={() => onRun(eKey)}
+                        onRestart={() => onRestart(eKey)}
+                        onStop={() => onStop(eKey)}
+                        onClose={() => onClose(eKey)}
                       />
-                      <Text style={styles.packageGroupHeader}>{groupLabel}</Text>
-                    </Pressable>
-
-                    {!collapsed ? (
-                      <View style={styles.entryList}>
-                        {scripts.map((script, index) => {
-                          const termName = terminalName("shell", script.path);
-                          const eKey = entryKey("shell", script.path);
-                          const isOpen = Boolean(openTerminals[termName]);
-                          const isActionPending = Boolean(
-                            pendingActionEntries[eKey],
-                          );
-
-                          return (
-                            <EntryRow
-                              key={script.path}
-                              workspaceId={workspaceId}
-                              name={script.path.slice(
-                                script.path.lastIndexOf("/") + 1,
-                              )}
-                              command={shellScriptCommand(
-                                script.path,
-                                script.executable,
-                              )}
-                              entryKey={eKey}
-                              theme={theme}
-                              compact={compact}
-                              isOpen={isOpen}
-                              isActionPending={isActionPending}
-                              actionsDisabled={actionsDisabled}
-                              showDivider={index > 0}
-                              canPreview={
-                                entryCanPreview
-                                  ? entryCanPreview(isOpen)
-                                  : undefined
-                              }
-                              onRun={() => onRun(eKey)}
-                              onRestart={() => onRestart(eKey)}
-                              onStop={() => onStop(eKey)}
-                              onClose={() => onClose(eKey)}
-                            />
-                          );
-                        })}
-                      </View>
-                    ) : null}
-                  </View>
-                );
-              })
+                    );
+                  })}
+                </EntryGroup>
+              ))
             : null}
         </>
       ) : null}

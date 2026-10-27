@@ -33,3 +33,11 @@ export const discoveryOutputSchema = z.object({
   truncated: z.boolean(),
 });
 export type DiscoveryResult = z.infer<typeof discoveryOutputSchema>;
+
+/** Root first, then lexicographic: the order groups and Packages are listed. */
+export function compareRelDirs(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a === "") return -1;
+  if (b === "") return 1;
+  return a < b ? -1 : 1;
+}
