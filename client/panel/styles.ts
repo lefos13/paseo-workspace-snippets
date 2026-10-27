@@ -53,6 +53,15 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
     list: {
       gap: 6,
     },
+    packageGroup: {
+      gap: 8,
+    },
+    packageGroupHeader: {
+      fontSize: 12,
+      fontWeight: "600" as const,
+      fontFamily: "monospace",
+      color: theme.colors.foregroundMuted,
+    },
     // Entry list: one bordered container, thin dividers between rows.
     entryList: {
       borderWidth: 1,

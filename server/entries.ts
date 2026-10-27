@@ -1,8 +1,9 @@
 import type { PluginSettings } from "@getpaseo/plugin/server";
 import { entryKey, snippetsFor, terminalName } from "../shared/entries";
 import type { snippetsSettings } from "../shared/settings";
-import type { DetectedScript } from "./package-json";
-import { detectScripts } from "./package-json";
+import type { DetectedScript } from "../shared/discovery";
+import { discoverEntries } from "./discovery";
+import { detectPackage } from "./package-json";
 import type { ResolvedWorkspace } from "./workspace";
 
 export interface ResolvedEntry {
@@ -42,7 +43,7 @@ export async function resolveEntry(
 
   if (entryKeyString.startsWith("script:")) {
     const scriptName = entryKeyString.slice("script:".length);
-    const detection = await detectScripts(paths.directory);
+    const detection = await detectPackage(paths.directory, "");
     if (detection.status !== "ok") {
       throw new Error(
         `ENTRY_NOT_FOUND: Cannot resolve script "${scriptName}": package.json is ${detection.status}`,
@@ -80,12 +81,13 @@ export async function resolveEntryByName(
 
   let scripts: DetectedScript[] = [];
   try {
-    const detection = await detectScripts(paths.directory);
-    if (detection.status === "ok") {
-      scripts = detection.scripts;
+    const discovery = await discoverEntries(paths.directory);
+    const root = discovery.packages.find((pkg) => pkg.relDir === "");
+    if (root?.status === "ok") {
+      scripts = root.scripts;
     }
   } catch {
-    // If detectScripts threw, scripts list is empty
+    // If discovery threw, the Root package's Scripts list is empty
   }
 
   const availableNames = [

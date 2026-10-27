@@ -12,7 +12,7 @@ import { Pressable, Text, View } from "react-native";
 import { entryKey, snippetsFor, terminalName } from "../../shared/entries";
 import {
   closeEntryRpc,
-  detectScriptsRpc,
+  discoverWorkspaceRpc,
   runEntryRpc,
   stopEntryRpc,
   terminalStatesRpc,
@@ -48,7 +48,7 @@ export function SnippetsPanel({
   const runEntry = useRpc(runEntryRpc);
   const stopEntry = useRpc(stopEntryRpc);
   const closeEntry = useRpc(closeEntryRpc);
-  const detectScripts = useRpc(detectScriptsRpc);
+  const discoverWorkspace = useRpc(discoverWorkspaceRpc);
 
   const { data: statesData, error: statesError } = useQuery({
     queryKey: ["states", workspaceId],
@@ -56,9 +56,9 @@ export function SnippetsPanel({
     refetchInterval: 3000,
   });
 
-  const { data: scriptsData, error: scriptsQueryError } = useQuery({
-    queryKey: ["detect", workspaceId],
-    queryFn: () => detectScripts({ workspaceId }),
+  const { data: discoveryData, error: discoveryQueryError } = useQuery({
+    queryKey: ["discover", workspaceId],
+    queryFn: () => discoverWorkspace({ workspaceId }),
   });
 
   const openTerminals = useMemo(() => statesData?.open ?? {}, [statesData]);
@@ -98,21 +98,14 @@ export function SnippetsPanel({
   const showScripts =
     settings.status === "ready" ? settings.values.showScripts : true;
 
-  const scriptsStatus = useMemo(() => {
-    if (scriptsQueryError) return "invalid";
-    return scriptsData?.status ?? "missing";
-  }, [scriptsQueryError, scriptsData]);
-
-  const scriptsError = useMemo(() => {
-    if (scriptsQueryError) return mapErrorMessage(scriptsQueryError);
-    return scriptsData?.error ?? null;
-  }, [scriptsQueryError, scriptsData]);
-
-  const scriptsPackageManager = scriptsData?.packageManager ?? "npm";
-  const scriptsList = useMemo(
-    () => scriptsData?.scripts ?? [],
-    [scriptsData?.scripts],
+  const packages = useMemo(
+    () => discoveryData?.packages ?? [],
+    [discoveryData?.packages],
   );
+
+  const discoveryError = discoveryQueryError
+    ? mapErrorMessage(discoveryQueryError)
+    : null;
 
   const workspaceUnavailable =
     !workspace || isWorkspaceUnavailable(statesError);
@@ -121,7 +114,7 @@ export function SnippetsPanel({
 
   const handleRefresh = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["detect", workspaceId] }),
+      queryClient.invalidateQueries({ queryKey: ["discover", workspaceId] }),
       queryClient.invalidateQueries({ queryKey: ["states", workspaceId] }),
     ]);
   };
@@ -593,10 +586,8 @@ export function SnippetsPanel({
           <ScriptsSection
             workspaceId={workspaceId}
             directory={workspace?.directory}
-            status={scriptsStatus}
-            error={scriptsError}
-            packageManager={scriptsPackageManager}
-            scripts={scriptsList}
+            packages={packages}
+            loadError={discoveryError}
             showScripts={showScripts}
             onToggleShowScripts={handleToggleShowScripts}
             openTerminals={openTerminals}
