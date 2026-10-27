@@ -1,9 +1,11 @@
+import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
   DetectedPackage,
   DiscoveryResult,
   PackageManager,
+  ShellScript,
 } from "../shared/discovery";
 import { detectPackage } from "./package-json";
 
@@ -35,6 +37,43 @@ async function readDirectory(directory: string) {
 }
 
 /**
+ * Adds the `*.sh` files of one directory to the scan. A symlinked file is
+ * only included when its real path stays inside the workspace, so a link
+ * cannot make the plugin run code from elsewhere. The executable flag comes
+ * from the real file's mode; files without it are still listed.
+ */
+async function collectShellScripts(
+  root: string,
+  dir: string,
+  relDir: string,
+  entries: Dirent[],
+  shellScripts: ShellScript[],
+): Promise<void> {
+  for (const entry of entries) {
+    if (!entry.name.endsWith(".sh")) continue;
+    if (!entry.isFile() && !entry.isSymbolicLink()) continue;
+
+    try {
+      const realPath = await fs.realpath(path.join(dir, entry.name));
+      if (
+        realPath !== root &&
+        !realPath.startsWith(`${root}${path.sep}`)
+      ) {
+        continue;
+      }
+      const stats = await fs.stat(realPath);
+      if (!stats.isFile()) continue;
+      shellScripts.push({
+        path: relDir ? `${relDir}/${entry.name}` : entry.name,
+        executable: (stats.mode & 0o111) !== 0,
+      });
+    } catch {
+      // Broken symlink or unreadable file: skip it rather than fail the scan.
+    }
+  }
+}
+
+/**
  * Reads everything runnable from a workspace directory.
  *
  * Discovers the Root package and every Nested package up to four levels deep,
@@ -47,6 +86,7 @@ export async function discoverEntries(
 ): Promise<DiscoveryResult> {
   const root = await fs.realpath(directory);
   const packages: DetectedPackage[] = [];
+  const shellScripts: ShellScript[] = [];
   let packageCount = 0;
   let truncated = false;
   let stopped = false;
@@ -88,6 +128,7 @@ export async function discoverEntries(
     }
 
     const entries = await readDirectory(dir);
+    await collectShellScripts(root, dir, relDir, entries, shellScripts);
     const childDirectories = entries.filter(
       (entry) =>
         entry.isDirectory() &&
@@ -118,10 +159,11 @@ export async function discoverEntries(
     if (b.relDir === "") return 1;
     return a.relDir < b.relDir ? -1 : 1;
   });
+  shellScripts.sort((a, b) => (a.path < b.path ? -1 : 1));
 
   return {
     packages,
-    shellScripts: [],
+    shellScripts,
     truncated,
   };
 }

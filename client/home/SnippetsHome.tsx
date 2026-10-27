@@ -25,6 +25,7 @@ import {
   mapErrorMessage,
 } from "../panel/errors";
 import { ScriptsSection } from "../panel/ScriptsSection";
+import { ShellScriptsSection } from "../panel/ShellScriptsSection";
 import { SnippetEditor } from "../panel/SnippetEditor";
 import { SnippetsSection } from "../panel/SnippetsSection";
 import { makeStyles } from "../panel/styles";
@@ -127,10 +128,16 @@ export function SnippetsHome({
 
   const showScripts =
     settings.status === "ready" ? settings.values.showScripts : true;
+  const showShellScripts =
+    settings.status === "ready" ? settings.values.showShellScripts : true;
 
   const packages = useMemo(
     () => discoveryData?.packages ?? [],
     [discoveryData?.packages],
+  );
+  const shellScripts = useMemo(
+    () => discoveryData?.shellScripts ?? [],
+    [discoveryData?.shellScripts],
   );
 
   const discoveryError = discoveryQueryError
@@ -157,6 +164,16 @@ export function SnippetsHome({
     const nextValues: SnippetsSettingsValues = {
       ...currentValues,
       showScripts: !currentValues.showScripts,
+    };
+    await settings.save(nextValues, settings.revision);
+  };
+
+  const handleToggleShowShellScripts = async () => {
+    if (settings.status !== "ready") return;
+    const currentValues = settings.values;
+    const nextValues: SnippetsSettingsValues = {
+      ...currentValues,
+      showShellScripts: !currentValues.showShellScripts,
     };
     await settings.save(nextValues, settings.revision);
   };
@@ -240,6 +257,26 @@ export function SnippetsHome({
 
   const handleCloseScript = (scriptName: string) => {
     const key = entryKey("script", scriptName);
+    return handleClose(key, key);
+  };
+
+  const handleRunShellScript = (relPath: string) => {
+    const key = entryKey("shell", relPath);
+    return handleRunOrRestart(key, key);
+  };
+
+  const handleRestartShellScript = (relPath: string) => {
+    const key = entryKey("shell", relPath);
+    return handleRunOrRestart(key, key);
+  };
+
+  const handleStopShellScript = (relPath: string) => {
+    const key = entryKey("shell", relPath);
+    return handleStop(key, key);
+  };
+
+  const handleCloseShellScript = (relPath: string) => {
+    const key = entryKey("shell", relPath);
     return handleClose(key, key);
   };
 
@@ -523,6 +560,25 @@ export function SnippetsHome({
                 onRestart={handleRestartScript}
                 onStop={handleStopScript}
                 onClose={handleCloseScript}
+              />
+              <ShellScriptsSection
+                workspaceId={workspaceId}
+                directory={selectedProject.projectRootPath}
+                projectRootPath={selectedProject.projectRootPath}
+                shellScripts={shellScripts}
+                loadError={discoveryError}
+                showShellScripts={showShellScripts}
+                onToggleShowShellScripts={handleToggleShowShellScripts}
+                openTerminals={openTerminals}
+                pendingActionEntries={pendingActions}
+                actionsDisabled={actionsDisabled}
+                entryCanPreview={(isOpen) => Boolean(workspaceId && isOpen)}
+                theme={theme}
+                compact={layout.compact}
+                onRun={handleRunShellScript}
+                onRestart={handleRestartShellScript}
+                onStop={handleStopShellScript}
+                onClose={handleCloseShellScript}
               />
               <SnippetsSection
                 title="Project snippets"

@@ -25,6 +25,7 @@ import {
   mapErrorMessage,
 } from "./errors";
 import { ScriptsSection } from "./ScriptsSection";
+import { ShellScriptsSection } from "./ShellScriptsSection";
 import { SnippetEditor } from "./SnippetEditor";
 import { SnippetsSection } from "./SnippetsSection";
 import { makeStyles } from "./styles";
@@ -97,10 +98,16 @@ export function SnippetsPanel({
 
   const showScripts =
     settings.status === "ready" ? settings.values.showScripts : true;
+  const showShellScripts =
+    settings.status === "ready" ? settings.values.showShellScripts : true;
 
   const packages = useMemo(
     () => discoveryData?.packages ?? [],
     [discoveryData?.packages],
+  );
+  const shellScripts = useMemo(
+    () => discoveryData?.shellScripts ?? [],
+    [discoveryData?.shellScripts],
   );
 
   const discoveryError = discoveryQueryError
@@ -125,6 +132,16 @@ export function SnippetsPanel({
     const nextValues: SnippetsSettingsValues = {
       ...currentValues,
       showScripts: !currentValues.showScripts,
+    };
+    await settings.save(nextValues, settings.revision);
+  };
+
+  const handleToggleShowShellScripts = async () => {
+    if (settings.status !== "ready") return;
+    const currentValues = settings.values;
+    const nextValues: SnippetsSettingsValues = {
+      ...currentValues,
+      showShellScripts: !currentValues.showShellScripts,
     };
     await settings.save(nextValues, settings.revision);
   };
@@ -284,6 +301,78 @@ export function SnippetsPanel({
 
   const handleCloseScript = async (scriptName: string) => {
     const key = entryKey("script", scriptName);
+    setPendingActions((prev) => ({ ...prev, [key]: true }));
+    try {
+      await closeEntry({
+        workspaceId,
+        entryKey: key,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["states", workspaceId],
+      });
+    } catch (err) {
+      toast.error(mapErrorMessage(err));
+    } finally {
+      setPendingActions((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleRunShellScript = async (relPath: string) => {
+    const key = entryKey("shell", relPath);
+    setPendingActions((prev) => ({ ...prev, [key]: true }));
+    try {
+      await runEntry({
+        workspaceId,
+        entryKey: key,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["states", workspaceId],
+      });
+    } catch (err) {
+      toast.error(mapErrorMessage(err));
+    } finally {
+      setPendingActions((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleRestartShellScript = async (relPath: string) => {
+    const key = entryKey("shell", relPath);
+    setPendingActions((prev) => ({ ...prev, [key]: true }));
+    try {
+      await runEntry({
+        workspaceId,
+        entryKey: key,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["states", workspaceId],
+      });
+    } catch (err) {
+      toast.error(mapErrorMessage(err));
+    } finally {
+      setPendingActions((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleStopShellScript = async (relPath: string) => {
+    const key = entryKey("shell", relPath);
+    setPendingActions((prev) => ({ ...prev, [key]: true }));
+    try {
+      await stopEntry({
+        workspaceId,
+        entryKey: key,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["states", workspaceId],
+      });
+    } catch (err) {
+      toast.error(mapErrorMessage(err));
+    } finally {
+      setPendingActions((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleCloseShellScript = async (relPath: string) => {
+    const key = entryKey("shell", relPath);
     setPendingActions((prev) => ({ ...prev, [key]: true }));
     try {
       await closeEntry({
@@ -601,6 +690,24 @@ export function SnippetsPanel({
             onRestart={handleRestartScript}
             onStop={handleStopScript}
             onClose={handleCloseScript}
+          />
+          <ShellScriptsSection
+            workspaceId={workspaceId}
+            directory={workspace?.directory}
+            projectRootPath={workspace?.projectRootPath}
+            shellScripts={shellScripts}
+            loadError={discoveryError}
+            showShellScripts={showShellScripts}
+            onToggleShowShellScripts={handleToggleShowShellScripts}
+            openTerminals={openTerminals}
+            pendingActionEntries={pendingActions}
+            actionsDisabled={actionsDisabled}
+            theme={theme}
+            compact={layout.compact}
+            onRun={handleRunShellScript}
+            onRestart={handleRestartShellScript}
+            onStop={handleStopShellScript}
+            onClose={handleCloseShellScript}
           />
           <SnippetsSection
             workspaceId={workspaceId}

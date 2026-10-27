@@ -15,6 +15,7 @@ function fakeSettings(
     projects: {},
     workspaces: {},
     showScripts: true,
+    showShellScripts: true,
     projectOrder: [],
     ...overrides,
   };
@@ -438,6 +439,224 @@ test("agrees with key resolution when a slash Script name collides with a Qualif
 
       assert.deepEqual(byName, byKey);
       assert.equal(byKey.command, "cd apps/web && npm run dev");
+    },
+  );
+});
+
+test("resolves an executable Shell script by key to a ./ command", async () => {
+  await withWorkspace(
+    {
+      "scripts/deploy.sh": {
+        content: "#!/bin/sh\necho deploy",
+        executable: true,
+      },
+    },
+    async (directory) => {
+      const entry = await resolveEntry(
+        fakeSettings(),
+        "shell:scripts/deploy.sh",
+        { directory, projectRootPath: directory },
+      );
+
+      assert.deepEqual(entry, {
+        key: "shell:scripts/deploy.sh",
+        label: "scripts/deploy.sh",
+        command: "./scripts/deploy.sh",
+        terminalName: "shell:scripts/deploy.sh",
+      });
+    },
+  );
+});
+
+test("runs a non-executable Shell script with bash", async () => {
+  await withWorkspace(
+    { "tools/setup.sh": "#!/bin/sh\necho setup" },
+    async (directory) => {
+      const entry = await resolveEntry(
+        fakeSettings(),
+        "shell:tools/setup.sh",
+        { directory, projectRootPath: directory },
+      );
+
+      assert.equal(entry.command, "bash tools/setup.sh");
+      assert.equal(entry.terminalName, "shell:tools/setup.sh");
+    },
+  );
+});
+
+test("quotes a Shell script path containing spaces", async () => {
+  await withWorkspace(
+    {
+      "my scripts/deploy.sh": {
+        content: "#!/bin/sh\necho deploy",
+        executable: true,
+      },
+      "my scripts/setup.sh": "#!/bin/sh\necho setup",
+    },
+    async (directory) => {
+      const executable = await resolveEntry(
+        fakeSettings(),
+        "shell:my scripts/deploy.sh",
+        { directory, projectRootPath: directory },
+      );
+      assert.equal(executable.command, "'./my scripts/deploy.sh'");
+
+      const plain = await resolveEntry(
+        fakeSettings(),
+        "shell:my scripts/setup.sh",
+        { directory, projectRootPath: directory },
+      );
+      assert.equal(plain.command, "bash 'my scripts/setup.sh'");
+    },
+  );
+});
+
+test("fails by key when the Shell script is gone", async () => {
+  await withWorkspace({}, async (directory) => {
+    await assert.rejects(
+      resolveEntry(fakeSettings(), "shell:scripts/deploy.sh", {
+        directory,
+        projectRootPath: directory,
+      }),
+      /ENTRY_NOT_FOUND: Shell script "scripts\/deploy.sh" not found/,
+    );
+  });
+});
+
+test("does not resolve a Shell script symlinked outside the workspace", async () => {
+  await withTempDir(async (base) => {
+    const outside = path.join(base, "outside.sh");
+    await fs.writeFile(outside, "#!/bin/sh\necho outside");
+    await fs.chmod(outside, 0o755);
+
+    const directory = path.join(base, "workspace");
+    await fs.mkdir(directory, { recursive: true });
+    await fs.symlink(outside, path.join(directory, "outside.sh"));
+
+    await assert.rejects(
+      resolveEntry(fakeSettings(), "shell:outside.sh", {
+        directory,
+        projectRootPath: directory,
+      }),
+      /ENTRY_NOT_FOUND: Shell script "outside.sh" not found/,
+    );
+  });
+});
+
+test("resolves a Shell script by its relative path", async () => {
+  await withWorkspace(
+    {
+      "scripts/deploy.sh": {
+        content: "#!/bin/sh\necho deploy",
+        executable: true,
+      },
+    },
+    async (directory) => {
+      const entry = await resolveEntryByName(
+        fakeSettings(),
+        "scripts/deploy.sh",
+        { directory, projectRootPath: directory },
+      );
+
+      assert.deepEqual(entry, {
+        key: "shell:scripts/deploy.sh",
+        label: "scripts/deploy.sh",
+        command: "./scripts/deploy.sh",
+        terminalName: "shell:scripts/deploy.sh",
+      });
+    },
+  );
+});
+
+test("resolves a Shell script by basename with or without .sh, regardless of case", async () => {
+  await withWorkspace(
+    {
+      "scripts/deploy.sh": {
+        content: "#!/bin/sh\necho deploy",
+        executable: true,
+      },
+    },
+    async (directory) => {
+      for (const name of ["deploy", "deploy.sh", "DEPLOY"]) {
+        const entry = await resolveEntryByName(fakeSettings(), name, {
+          directory,
+          projectRootPath: directory,
+        });
+        assert.equal(entry.key, "shell:scripts/deploy.sh");
+        assert.equal(entry.command, "./scripts/deploy.sh");
+      }
+    },
+  );
+});
+
+test("reports ambiguity when two Shell scripts share a basename", async () => {
+  await withWorkspace(
+    {
+      "scripts/deploy.sh": "#!/bin/sh\n",
+      "tools/deploy.sh": "#!/bin/sh\n",
+    },
+    async (directory) => {
+      await assert.rejects(
+        resolveEntryByName(fakeSettings(), "deploy", {
+          directory,
+          projectRootPath: directory,
+        }),
+        /AMBIGUOUS_NAME: "deploy" matches scripts\/deploy.sh, tools\/deploy.sh/,
+      );
+    },
+  );
+});
+
+test("reports ambiguity when a Shell script and a Nested Script tie", async () => {
+  await withWorkspace(
+    {
+      "package.json": packageJson({ scripts: {} }),
+      "apps/web/package.json": packageJson({ scripts: { deploy: "echo web" } }),
+      "scripts/deploy.sh": "#!/bin/sh\n",
+    },
+    async (directory) => {
+      await assert.rejects(
+        resolveEntryByName(fakeSettings(), "deploy", {
+          directory,
+          projectRootPath: directory,
+        }),
+        /AMBIGUOUS_NAME: "deploy" matches apps\/web\/deploy, scripts\/deploy.sh/,
+      );
+    },
+  );
+});
+
+test("prefers an exact Root Script over a Shell script basename", async () => {
+  await withWorkspace(
+    {
+      "package.json": packageJson({ scripts: { deploy: "echo root" } }),
+      "scripts/deploy.sh": "#!/bin/sh\n",
+    },
+    async (directory) => {
+      const entry = await resolveEntryByName(fakeSettings(), "deploy", {
+        directory,
+        projectRootPath: directory,
+      });
+
+      assert.equal(entry.key, "script:deploy");
+    },
+  );
+});
+
+test("lists Shell script paths when nothing matches", async () => {
+  await withWorkspace(
+    {
+      "package.json": packageJson({ scripts: { build: "tsc" } }),
+      "scripts/deploy.sh": "#!/bin/sh\n",
+    },
+    async (directory) => {
+      await assert.rejects(
+        resolveEntryByName(fakeSettings(), "nope", {
+          directory,
+          projectRootPath: directory,
+        }),
+        /ENTRY_NOT_FOUND: no snippet or script named "nope"\. Available: build, scripts\/deploy\.sh/,
+      );
     },
   );
 });

@@ -66,6 +66,9 @@ export default function contribute(server: PluginServerContext) {
             qualifiedScriptName(pkg.relDir, script.name),
           ),
         );
+        scriptNames.push(
+          ...discovery.shellScripts.map((script) => script.path),
+        );
       } catch {
         // non-fatal for listing
       }

@@ -7,7 +7,7 @@ export const WorkspaceInput = z.object({
 });
 
 export const EntryInput = WorkspaceInput.extend({
-  entryKey: z.string().regex(/^(script|snippet):.+$/),
+  entryKey: z.string().regex(/^(script|snippet|shell):.+$/),
 });
 
 export const ProjectInput = z.object({
@@ -15,7 +15,7 @@ export const ProjectInput = z.object({
 });
 
 export const ProjectEntryInput = ProjectInput.extend({
-  entryKey: z.string().regex(/^(script|snippet):.+$/),
+  entryKey: z.string().regex(/^(script|snippet|shell):.+$/),
 });
 
 export const discoverWorkspaceRpc = defineRpc({

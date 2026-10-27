@@ -457,3 +457,78 @@ test("surfaces Nested packages when the Root has no package.json", async () => {
     },
   );
 });
+
+test("finds Shell scripts at several depths with their executable flag", async () => {
+  await withWorkspace(
+    {
+      "run.sh": { content: "#!/bin/sh\necho run", executable: false },
+      "scripts/deploy.sh": { content: "#!/bin/sh\necho deploy", executable: true },
+      "tools/setup.sh": { content: "#!/bin/sh\necho setup", executable: false },
+      "a/b/c/d/deep.sh": { content: "#!/bin/sh\necho deep", executable: true },
+    },
+    async (directory) => {
+      const result = await discoverEntries(directory);
+
+      assert.deepEqual(result.shellScripts, [
+        { path: "a/b/c/d/deep.sh", executable: true },
+        { path: "run.sh", executable: false },
+        { path: "scripts/deploy.sh", executable: true },
+        { path: "tools/setup.sh", executable: false },
+      ]);
+      assert.doesNotThrow(() => discoveryOutputSchema.parse(result));
+    },
+  );
+});
+
+test("skips Shell scripts in ignored, dot and too-deep folders", async () => {
+  await withWorkspace(
+    {
+      "keep.sh": "#!/bin/sh\n",
+      "node_modules/dep/dep.sh": "#!/bin/sh\n",
+      ".git/hooks/hook.sh": "#!/bin/sh\n",
+      "dist/build.sh": "#!/bin/sh\n",
+      "build/build.sh": "#!/bin/sh\n",
+      ".next/next.sh": "#!/bin/sh\n",
+      ".cache/cache.sh": "#!/bin/sh\n",
+      "a/b/c/d/e/too-deep.sh": "#!/bin/sh\n",
+    },
+    async (directory) => {
+      const result = await discoverEntries(directory);
+
+      assert.deepEqual(
+        result.shellScripts.map((script) => script.path),
+        ["keep.sh"],
+      );
+      assert.equal(result.truncated, true);
+    },
+  );
+});
+
+test("follows a Shell script symlink only when its real path is inside the workspace", async () => {
+  await withTempDir(async (base) => {
+    const outside = path.join(base, "outside.sh");
+    await fs.writeFile(outside, "#!/bin/sh\necho outside\n");
+    await fs.chmod(outside, 0o755);
+
+    const directory = path.join(base, "workspace");
+    await fs.mkdir(path.join(directory, "scripts"), { recursive: true });
+    await fs.writeFile(
+      path.join(directory, "scripts", "deploy.sh"),
+      "#!/bin/sh\necho deploy\n",
+    );
+    await fs.chmod(path.join(directory, "scripts", "deploy.sh"), 0o755);
+    await fs.symlink(
+      path.join("scripts", "deploy.sh"),
+      path.join(directory, "linked.sh"),
+    );
+    await fs.symlink(outside, path.join(directory, "outside.sh"));
+    await fs.symlink("missing.sh", path.join(directory, "broken.sh"));
+
+    const result = await discoverEntries(directory);
+
+    assert.deepEqual(result.shellScripts, [
+      { path: "linked.sh", executable: true },
+      { path: "scripts/deploy.sh", executable: true },
+    ]);
+  });
+});
