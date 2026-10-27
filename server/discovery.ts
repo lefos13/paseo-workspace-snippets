@@ -89,6 +89,15 @@ async function scanDirectory(
   return { dir, relDir, entries, shellScripts };
 }
 
+/** Whether a folder directly holds a package.json, without reading it. */
+function hasPackageJson(entries: Dirent[]): boolean {
+  return entries.some(
+    (entry) =>
+      entry.name === "package.json" &&
+      (entry.isFile() || entry.isSymbolicLink()),
+  );
+}
+
 /**
  * Whether a folder kept out by the depth limit directly holds a Package or
  * Shell script. Plain source folders at the limit are not worth a warning.
@@ -118,35 +127,35 @@ export async function discoverEntries(
   const shellScripts: ShellScript[] = [];
   let packageCount = 0;
   let truncated = false;
-  let stopped = false;
 
   const walk = async (
     scan: DirectoryScan,
     depth: number,
     inheritedPackageManager: PackageManager,
   ): Promise<void> => {
-    if (stopped) return;
     const { dir, relDir, entries } = scan;
 
-    let detected: DetectedPackage;
-    try {
-      detected = await detectPackage(dir, relDir, inheritedPackageManager);
-    } catch (err) {
-      // A single unreadable Package must not hide the others, including the
-      // Root package: report it as invalid and keep walking.
-      detected = invalidPackage(relDir, inheritedPackageManager, err);
-    }
-
-    if (detected.status !== "missing") {
-      if (packageCount >= MAX_PACKAGES) {
-        truncated = true;
-        stopped = true;
-        return;
+    if (packageCount >= MAX_PACKAGES) {
+      // Stop reading package.json once the cap is hit, but keep walking so
+      // Shell scripts after the cap are still listed.
+      if (relDir !== "" && hasPackageJson(entries)) truncated = true;
+    } else {
+      let detected: DetectedPackage;
+      try {
+        detected = await detectPackage(dir, relDir, inheritedPackageManager);
+      } catch (err) {
+        // A single unreadable Package must not hide the others, including the
+        // Root package: report it as invalid and keep walking.
+        detected = invalidPackage(relDir, inheritedPackageManager, err);
       }
-      packageCount += 1;
-      packages.push(detected);
-    } else if (relDir === "") {
-      packages.push(detected);
+
+      if (detected.status !== "missing") {
+        packageCount += 1;
+        packages.push(detected);
+      } else if (relDir === "") {
+        packages.push(detected);
+      }
+      inheritedPackageManager = detected.packageManager;
     }
 
     shellScripts.push(...scan.shellScripts);
@@ -179,8 +188,7 @@ export async function discoverEntries(
     );
 
     for (const childScan of childScans) {
-      if (stopped) return;
-      await walk(childScan, depth + 1, detected.packageManager);
+      await walk(childScan, depth + 1, inheritedPackageManager);
     }
   };
 

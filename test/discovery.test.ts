@@ -321,6 +321,31 @@ test("caps discovery at 50 Packages and reports truncation", async () => {
   });
 });
 
+test("keeps collecting Shell scripts after the Package cap", async () => {
+  const files: Record<string, string> = {
+    "package.json": packageJson({ scripts: { dev: "vite" } }),
+    "zzz/late.sh": "#!/bin/sh\n",
+    "pkg-59/late.sh": "#!/bin/sh\n",
+  };
+  for (let index = 0; index < 60; index += 1) {
+    files[`pkg-${String(index).padStart(2, "0")}/package.json`] = packageJson({
+      scripts: { dev: "x" },
+    });
+  }
+
+  await withWorkspace(files, async (directory) => {
+    const result = await discoverEntries(directory);
+
+    assert.equal(result.packages.length, 50);
+    assert.equal(result.packages.some((pkg) => pkg.relDir === "pkg-59"), false);
+    assert.equal(result.truncated, true);
+    assert.deepEqual(
+      result.shellScripts.map((script) => script.path),
+      ["pkg-59/late.sh", "zzz/late.sh"],
+    );
+  });
+});
+
 test("does not follow symlinked directories", async () => {
   await withTempDir(async (base) => {
     const outside = path.join(base, "outside");
