@@ -12,7 +12,7 @@ import { Pressable, Text, View } from "react-native";
 import { entryKey, terminalName } from "../../shared/entries";
 import {
   closeEntryRpc,
-  projectDetectRpc,
+  discoverProjectRpc,
   projectRunEntryRpc,
   projectStatesRpc,
   stopEntryRpc,
@@ -25,8 +25,10 @@ import {
   mapErrorMessage,
 } from "../panel/errors";
 import { ScriptsSection } from "../panel/ScriptsSection";
+import { ShellScriptsSection } from "../panel/ShellScriptsSection";
 import { SnippetEditor } from "../panel/SnippetEditor";
 import { SnippetsSection } from "../panel/SnippetsSection";
+import { useEntryActions } from "../panel/entryActions";
 import { makeStyles } from "../panel/styles";
 import { ProjectList, shortenPath } from "./ProjectList";
 import type { ProjectDescriptor } from "./ProjectList";
@@ -87,7 +89,7 @@ export function SnippetsHome({
   const projectRootPath = selectedProject?.projectRootPath;
 
   const getProjectStates = useRpc(projectStatesRpc);
-  const getProjectScripts = useRpc(projectDetectRpc);
+  const discoverProject = useRpc(discoverProjectRpc);
   const runProjectEntry = useRpc(projectRunEntryRpc);
   const stopEntry = useRpc(stopEntryRpc);
   const closeEntry = useRpc(closeEntryRpc);
@@ -99,9 +101,9 @@ export function SnippetsHome({
     refetchInterval: 3000,
   });
 
-  const { data: scriptsData, error: scriptsQueryError } = useQuery({
-    queryKey: ["projectDetect", projectId],
-    queryFn: () => getProjectScripts({ projectId: projectId! }),
+  const { data: discoveryData, error: discoveryQueryError } = useQuery({
+    queryKey: ["projectDiscover", projectId],
+    queryFn: () => discoverProject({ projectId: projectId! }),
     enabled: Boolean(projectId),
   });
 
@@ -116,11 +118,6 @@ export function SnippetsHome({
   const [capturedValues, setCapturedValues] =
     useState<SnippetsSettingsValues | null>(null);
 
-  const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
-    {},
-  );
-  const [lastRunKey, setLastRunKey] = useState<string | null>(null);
-
   const projectSnippets = useMemo(() => {
     if (settings.status !== "ready" || !projectRootPath) return [];
     return settings.values.projects?.[projectRootPath] ?? [];
@@ -128,22 +125,21 @@ export function SnippetsHome({
 
   const showScripts =
     settings.status === "ready" ? settings.values.showScripts : true;
+  const showShellScripts =
+    settings.status === "ready" ? settings.values.showShellScripts : true;
 
-  const scriptsStatus = useMemo(() => {
-    if (scriptsQueryError) return "invalid";
-    return scriptsData?.status ?? "missing";
-  }, [scriptsQueryError, scriptsData]);
-
-  const scriptsError = useMemo(() => {
-    if (scriptsQueryError) return mapErrorMessage(scriptsQueryError);
-    return scriptsData?.error ?? null;
-  }, [scriptsQueryError, scriptsData]);
-
-  const scriptsPackageManager = scriptsData?.packageManager ?? "npm";
-  const scriptsList = useMemo(
-    () => scriptsData?.scripts ?? [],
-    [scriptsData?.scripts],
+  const packages = useMemo(
+    () => discoveryData?.packages ?? [],
+    [discoveryData?.packages],
   );
+  const shellScripts = useMemo(
+    () => discoveryData?.shellScripts ?? [],
+    [discoveryData?.shellScripts],
+  );
+
+  const discoveryError = discoveryQueryError
+    ? mapErrorMessage(discoveryQueryError)
+    : null;
 
   const terminalsUnsupported = isTerminalsUnsupported(statesError);
   const projectUnavailable = isProjectUnavailable(statesError);
@@ -152,7 +148,9 @@ export function SnippetsHome({
   const handleRefresh = async () => {
     if (!projectId) return;
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["projectDetect", projectId] }),
+      queryClient.invalidateQueries({
+        queryKey: ["projectDiscover", projectId],
+      }),
       queryClient.invalidateQueries({ queryKey: ["projectStates", projectId] }),
     ]);
   };
@@ -167,111 +165,42 @@ export function SnippetsHome({
     await settings.save(nextValues, settings.revision);
   };
 
-  const handleRunOrRestart = async (
-    entryKeyString: string,
-    idForPending: string,
-  ) => {
-    if (!projectId) return;
-    setPendingActions((prev) => ({ ...prev, [idForPending]: true }));
-    try {
-      const result = await runProjectEntry({
-        projectId,
-        entryKey: entryKeyString,
-      });
-      setLastRunKey(entryKeyString);
-      await queryClient.invalidateQueries({
-        queryKey: ["projectStates", projectId],
-      });
+  const handleToggleShowShellScripts = async () => {
+    if (settings.status !== "ready") return;
+    const currentValues = settings.values;
+    const nextValues: SnippetsSettingsValues = {
+      ...currentValues,
+      showShellScripts: !currentValues.showShellScripts,
+    };
+    await settings.save(nextValues, settings.revision);
+  };
+
+  const entryActions = useEntryActions({
+    run: async (key) => {
+      if (!projectId) return;
+      const result = await runProjectEntry({ projectId, entryKey: key });
       if (navigation?.openWorkspace) {
         navigation.openWorkspace({ workspaceId: result.workspaceId });
       } else {
         toast.show("Started in workspace", { variant: "info" });
       }
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [idForPending]: false }));
-    }
-  };
-
-  const handleStop = async (entryKeyString: string, idForPending: string) => {
-    if (!workspaceId || !projectId) return;
-    setPendingActions((prev) => ({ ...prev, [idForPending]: true }));
-    try {
-      await stopEntry({
-        workspaceId,
-        entryKey: entryKeyString,
-      });
+    },
+    stop: async (key) => {
+      if (!workspaceId || !projectId) return;
+      await stopEntry({ workspaceId, entryKey: key });
+    },
+    close: async (key) => {
+      if (!workspaceId || !projectId) return;
+      await closeEntry({ workspaceId, entryKey: key });
+    },
+    refresh: async () => {
+      if (!projectId) return;
       await queryClient.invalidateQueries({
         queryKey: ["projectStates", projectId],
       });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [idForPending]: false }));
-    }
-  };
-
-  const handleClose = async (entryKeyString: string, idForPending: string) => {
-    if (!workspaceId || !projectId) return;
-    setPendingActions((prev) => ({ ...prev, [idForPending]: true }));
-    try {
-      await closeEntry({
-        workspaceId,
-        entryKey: entryKeyString,
-      });
-      if (lastRunKey === entryKeyString) {
-        setLastRunKey(null);
-      }
-      await queryClient.invalidateQueries({
-        queryKey: ["projectStates", projectId],
-      });
-    } catch (err) {
-      toast.error(mapErrorMessage(err));
-    } finally {
-      setPendingActions((prev) => ({ ...prev, [idForPending]: false }));
-    }
-  };
-
-  const handleRunScript = (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    return handleRunOrRestart(key, key);
-  };
-
-  const handleRestartScript = (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    return handleRunOrRestart(key, key);
-  };
-
-  const handleStopScript = (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    return handleStop(key, key);
-  };
-
-  const handleCloseScript = (scriptName: string) => {
-    const key = entryKey("script", scriptName);
-    return handleClose(key, key);
-  };
-
-  const handleRunSnippet = (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    return handleRunOrRestart(key, snippet.id);
-  };
-
-  const handleRestartSnippet = (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    return handleRunOrRestart(key, snippet.id);
-  };
-
-  const handleStopSnippet = (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    return handleStop(key, snippet.id);
-  };
-
-  const handleCloseSnippet = (snippet: Snippet) => {
-    const key = entryKey("snippet", snippet.id);
-    return handleClose(key, snippet.id);
-  };
+    },
+    onError: (error) => toast.error(mapErrorMessage(error)),
+  });
 
   const handleOpenAdd = () => {
     if (settings.status !== "ready") return;
@@ -413,11 +342,6 @@ export function SnippetsHome({
       openTerminals[terminalName("snippet", editingSnippet.name)],
   );
 
-  const lastRunSnippetId =
-    lastRunKey && lastRunKey.startsWith("snippet:")
-      ? lastRunKey.slice("snippet:".length)
-      : null;
-
   const content = (
     <>
       {selectedProject ? (
@@ -522,39 +446,56 @@ export function SnippetsHome({
               <ScriptsSection
                 workspaceId={workspaceId}
                 directory={selectedProject.projectRootPath}
-                status={scriptsStatus}
-                error={scriptsError}
-                packageManager={scriptsPackageManager}
-                scripts={scriptsList}
+                projectRootPath={selectedProject.projectRootPath}
+                packages={packages}
+                truncated={discoveryData?.truncated ?? false}
+                loadError={discoveryError}
                 showScripts={showScripts}
                 onToggleShowScripts={handleToggleShowScripts}
                 openTerminals={openTerminals}
-                pendingActionEntries={pendingActions}
+                pendingActionEntries={entryActions.pendingActionEntries}
                 actionsDisabled={actionsDisabled}
-                lastRunKey={lastRunKey}
                 entryCanPreview={(isOpen) => Boolean(workspaceId && isOpen)}
                 theme={theme}
                 compact={layout.compact}
-                onRun={handleRunScript}
-                onRestart={handleRestartScript}
-                onStop={handleStopScript}
-                onClose={handleCloseScript}
+                onRun={entryActions.run}
+                onRestart={entryActions.restart}
+                onStop={entryActions.stop}
+                onClose={entryActions.close}
+              />
+              <ShellScriptsSection
+                workspaceId={workspaceId}
+                directory={selectedProject.projectRootPath}
+                projectRootPath={selectedProject.projectRootPath}
+                shellScripts={shellScripts}
+                loadError={discoveryError}
+                showShellScripts={showShellScripts}
+                onToggleShowShellScripts={handleToggleShowShellScripts}
+                openTerminals={openTerminals}
+                pendingActionEntries={entryActions.pendingActionEntries}
+                actionsDisabled={actionsDisabled}
+                entryCanPreview={(isOpen) => Boolean(workspaceId && isOpen)}
+                theme={theme}
+                compact={layout.compact}
+                onRun={entryActions.run}
+                onRestart={entryActions.restart}
+                onStop={entryActions.stop}
+                onClose={entryActions.close}
               />
               <SnippetsSection
                 title="Project snippets"
                 workspaceId={workspaceId}
                 snippets={projectSnippets}
                 openTerminals={openTerminals}
-                pendingActionEntries={pendingActions}
+                pendingActionEntries={entryActions.pendingActionEntries}
                 actionsDisabled={actionsDisabled}
-                lastRunSnippetId={lastRunSnippetId}
                 entryCanPreview={(isOpen) => Boolean(workspaceId && isOpen)}
                 theme={theme}
                 compact={layout.compact}
-                onRun={handleRunSnippet}
-                onRestart={handleRestartSnippet}
-                onStop={handleStopSnippet}
-                onClose={handleCloseSnippet}
+                onRun={entryActions.run}
+                onRestart={entryActions.restart}
+                onStop={entryActions.stop}
+                onClose={entryActions.close}
                 onAdd={handleOpenAdd}
                 onEdit={handleOpenEdit}
                 onDelete={handleOpenDelete}

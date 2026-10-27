@@ -17,11 +17,13 @@ export function snippetsFor(
   return [...projectSnippets, ...workspaceSnippets];
 }
 
-export function entryKey(type: "snippet" | "script", identifier: string): string {
+export type EntryType = "snippet" | "script" | "shell";
+
+export function entryKey(type: EntryType, identifier: string): string {
   return `${type}:${identifier}`;
 }
 
-export function terminalName(type: "snippet" | "script", name: string): string {
+export function terminalName(type: EntryType, name: string): string {
   return `${type}:${name}`;
 }
 
@@ -32,9 +34,35 @@ export function shellQuote(str: string): string {
   return `'${str.replace(/'/g, "'\\''")}'`;
 }
 
+/**
+ * Name of a Script that is unique across Packages: `<relDir>/<name>` for a
+ * Nested package, bare `<name>` for the Root package.
+ */
+export function qualifiedScriptName(
+  relDir: string,
+  scriptName: string,
+): string {
+  return relDir ? `${relDir}/${scriptName}` : scriptName;
+}
+
+/**
+ * Command that runs a Shell script from the workspace root: the file itself
+ * when it is executable (honouring its shebang), otherwise `bash <path>`.
+ */
+export function shellScriptCommand(
+  relPath: string,
+  executable: boolean,
+): string {
+  return executable ? shellQuote(`./${relPath}`) : `bash ${shellQuote(relPath)}`;
+}
+
 export function scriptCommand(
   pm: "npm" | "pnpm" | "yarn" | "bun",
   scriptName: string,
+  relDir = "",
 ): string {
-  return `${pm} run ${shellQuote(scriptName)}`;
+  const command = `${pm} run ${shellQuote(scriptName)}`;
+  // The subshell keeps the interactive shell's cwd, so Restart can re-send the
+  // command into the same terminal instead of failing on `cd`.
+  return relDir ? `(cd ${shellQuote(relDir)} && ${command})` : command;
 }

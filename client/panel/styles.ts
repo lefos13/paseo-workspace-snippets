@@ -53,61 +53,70 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
     list: {
       gap: 6,
     },
-    // Desktop row
-    row: {
+    packageGroup: {
+      gap: 8,
+    },
+    packageGroupHeaderRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      justifyContent: "space-between" as const,
-      paddingVertical: 10,
-      paddingHorizontal: 14,
-      borderRadius: 6,
-      backgroundColor: theme.colors.surface1,
+      gap: 6,
+      paddingVertical: 2,
+    },
+    packageGroupHeader: {
+      fontSize: 12,
+      fontWeight: "600" as const,
+      fontFamily: "monospace",
+      color: theme.colors.foregroundMuted,
+    },
+    sectionNote: {
+      fontSize: 11,
+      lineHeight: 16,
+      color: theme.colors.foregroundMuted,
+    },
+    // Entry list: one bordered container, thin dividers between rows.
+    entryList: {
       borderWidth: 1,
       borderColor: theme.colors.border,
-      gap: 12,
+      borderRadius: 8,
+      backgroundColor: theme.colors.surface1,
     },
-    rowMain: {
-      flex: 1,
-      gap: 4,
+    entryItemDivider: {
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    entryRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 8,
+      minHeight: 32,
+      paddingVertical: 4,
+      paddingHorizontal: 12,
     },
     rowTrailing: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: 12,
+      gap: 8,
     },
     rowActions: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
       gap: 8,
     },
-    // Compact row
-    compactRow: {
-      paddingVertical: 10,
-      paddingHorizontal: 14,
-      borderRadius: 6,
-      backgroundColor: theme.colors.surface1,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      gap: 8,
-    },
-    compactRowHeader: {
-      flexDirection: "row" as const,
-      justifyContent: "space-between" as const,
-      alignItems: "center" as const,
-    },
-    compactRowActions: {
+    entryActions: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: 8,
-      marginTop: 4,
+      gap: 2,
     },
     // Entry items
     entryName: {
-      fontSize: 14,
+      flexShrink: 1,
+      fontSize: 13,
       fontWeight: "600" as const,
       color: theme.colors.foreground,
     },
     entryCommand: {
+      flex: 1,
+      minWidth: 0,
       fontSize: 12,
       fontFamily: "monospace",
       color: theme.colors.foregroundMuted,
@@ -126,11 +135,6 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
       textTransform: "lowercase" as const,
     },
     // Status indicators
-    statusContainer: {
-      flexDirection: "row" as const,
-      alignItems: "center" as const,
-      gap: 6,
-    },
     statusDotOpen: {
       width: 8,
       height: 8,
@@ -143,22 +147,10 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
       borderRadius: 4,
       backgroundColor: theme.colors.foregroundMuted,
     },
-    statusLabel: {
-      fontSize: 12,
-      color: theme.colors.foregroundMuted,
-    },
-    tabHintText: {
-      fontSize: 11,
-      color: theme.colors.foregroundMuted,
-      marginTop: 4,
-    },
-    chevronButton: {
-      padding: 4,
-      alignItems: "center" as const,
-      justifyContent: "center" as const,
-    },
     outputContainer: {
       marginTop: 8,
+      marginHorizontal: 10,
+      marginBottom: 8,
       padding: 10,
       borderRadius: 6,
       backgroundColor: theme.colors.surface0,
@@ -171,39 +163,56 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
       fontFamily: "monospace",
       color: theme.colors.foregroundMuted,
     },
-    // Action buttons
-    actionButton: {
-      flexDirection: "row" as const,
+    // Icon-only actions with hover tooltips
+    iconAction: {
+      width: 24,
+      height: 24,
       alignItems: "center" as const,
-      gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
+      justifyContent: "center" as const,
+      borderRadius: 4,
+    },
+    iconActionHovered: {
+      backgroundColor: theme.colors.surface2,
+    },
+    tooltip: {
+      position: "absolute" as const,
+      right: 0,
+      bottom: 26,
+      zIndex: 10,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
       borderRadius: 4,
       backgroundColor: theme.colors.surface2,
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
-    actionButtonDisabled: {
-      opacity: 0.5,
-    },
-    actionButtonText: {
-      fontSize: 12,
+    tooltipText: {
+      fontSize: 11,
       color: theme.colors.foreground,
     },
-    actionDangerButton: {
+    // Snippet overflow menu
+    menuContainer: {
+      gap: 2,
+      padding: 8,
+    },
+    menuItem: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
-      gap: 4,
+      gap: 10,
       paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 4,
-      backgroundColor: theme.colors.surface2,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
+      paddingVertical: 10,
+      borderRadius: 6,
     },
-    actionDangerButtonText: {
-      fontSize: 12,
+    menuItemText: {
+      fontSize: 14,
+      color: theme.colors.foreground,
+    },
+    menuItemTextDanger: {
       color: theme.colors.statusDanger,
+    },
+    // Action buttons
+    actionButtonDisabled: {
+      opacity: 0.5,
     },
     // General buttons
     buttonPrimary: {

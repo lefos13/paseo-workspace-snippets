@@ -1,8 +1,30 @@
 import type { PluginSettings } from "@getpaseo/plugin/server";
-import { entryKey, snippetsFor, terminalName } from "../shared/entries";
+import fs from "node:fs/promises";
+import path from "node:path";
+import type {
+  DetectedPackage,
+  DetectedScript,
+  PackageManager,
+  ShellScript,
+} from "../shared/discovery";
+import {
+  entryKey,
+  qualifiedScriptName,
+  shellScriptCommand,
+  snippetsFor,
+  terminalName,
+} from "../shared/entries";
 import type { snippetsSettings } from "../shared/settings";
-import type { DetectedScript } from "./package-json";
-import { detectScripts } from "./package-json";
+import { discoverEntries } from "./discovery";
+import {
+  isDiscoverablePackageDir,
+  isDiscoverableShellScriptPath,
+  relativeSegments,
+} from "./discoverable";
+import {
+  detectPackage,
+  invalidPackage,
+} from "./package-json";
 import type { ResolvedWorkspace } from "./workspace";
 
 export interface ResolvedEntry {
@@ -10,6 +32,174 @@ export interface ResolvedEntry {
   label: string;
   command: string;
   terminalName: string;
+}
+
+interface FoundScript {
+  package: DetectedPackage;
+  script: DetectedScript;
+}
+
+interface NameCandidate {
+  /** Every name the entry answers to, lowest precedence last. */
+  names: string[];
+  displayName: string;
+  /** Package folder, "" for the Root package. */
+  relDir: string;
+  entry: ResolvedEntry;
+}
+
+function entryForScript(
+  key: string,
+  pkg: DetectedPackage,
+  script: DetectedScript,
+): ResolvedEntry {
+  return {
+    key,
+    label: script.name,
+    command: script.command,
+    terminalName: terminalName(
+      "script",
+      qualifiedScriptName(pkg.relDir, script.name),
+    ),
+  };
+}
+
+function entryForShellScript(key: string, script: ShellScript): ResolvedEntry {
+  return {
+    key,
+    label: script.path,
+    command: shellScriptCommand(script.path, script.executable),
+    terminalName: terminalName("shell", script.path),
+  };
+}
+
+/**
+ * Walks to an existing Package folder. Returns null when a segment is missing
+ * or is a symlink: the scan never follows symlinked folders, so a key through
+ * one must not resolve.
+ */
+async function resolveExistingDirectory(
+  workspaceRoot: string,
+  segments: string[],
+): Promise<string | null> {
+  let directory = workspaceRoot;
+  for (const segment of segments) {
+    directory = path.join(directory, segment);
+    try {
+      const stats = await fs.lstat(directory);
+      if (!stats.isDirectory()) return null;
+    } catch {
+      return null;
+    }
+  }
+  return directory;
+}
+
+/**
+ * Resolves a `shell:<relPath>` key by statting only that file. The path must
+ * satisfy the scan rules, because a key discovery never lists (another
+ * extension, a skipped folder, too deep) must not run. A symlinked file is
+ * accepted only when its real path stays inside the workspace.
+ */
+async function findShellScript(
+  workspaceRoot: string,
+  relPath: string,
+): Promise<ShellScript | null> {
+  if (!isDiscoverableShellScriptPath(relPath)) return null;
+  const segments = relativeSegments(relPath);
+  if (!segments || segments.length === 0) return null;
+
+  const fileName = segments[segments.length - 1];
+  const directory = await resolveExistingDirectory(
+    workspaceRoot,
+    segments.slice(0, -1),
+  );
+  if (!directory) return null;
+
+  try {
+    let stats = await fs.lstat(path.join(directory, fileName));
+    if (stats.isSymbolicLink()) {
+      const realPath = await fs.realpath(path.join(directory, fileName));
+      if (
+        realPath !== workspaceRoot &&
+        !realPath.startsWith(`${workspaceRoot}${path.sep}`)
+      ) {
+        return null;
+      }
+      stats = await fs.stat(realPath);
+    }
+    if (!stats.isFile()) return null;
+    return { path: relPath, executable: (stats.mode & 0o111) !== 0 };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolves a `script:<identifier>` key without walking the workspace: the key
+ * names the Package folder, so only that `package.json` (and its ancestors'
+ * Package managers) is read. Folder candidates must satisfy the scan rules, so
+ * a key discovery never lists cannot resolve.
+ */
+async function findScriptByIdentifier(
+  workspaceRoot: string,
+  identifier: string,
+): Promise<{ root: DetectedPackage; match: FoundScript | null }> {
+  const root = await detectPackage(workspaceRoot, "", "npm").catch((err) =>
+    invalidPackage("", "npm", err),
+  );
+  const rootScript = root.scripts.find((script) => script.name === identifier);
+  if (root.status === "ok" && rootScript) {
+    return { root, match: { package: root, script: rootScript } };
+  }
+
+  // Qualified names use `/` between the Package folder and the Script name, so
+  // try the longest folder first: `apps/web/dev` beats Script `web/dev` of an
+  // `apps` Package.
+  const candidates: { relDir: string; scriptName: string }[] = [];
+  for (let index = identifier.length - 1; index >= 0; index -= 1) {
+    if (identifier[index] !== "/") continue;
+    const relDir = identifier.slice(0, index);
+    if (!isDiscoverablePackageDir(relDir)) continue;
+    candidates.push({ relDir, scriptName: identifier.slice(index + 1) });
+  }
+
+  const deepest = candidates[0]
+    ? relativeSegments(candidates[0].relDir)
+    : null;
+  if (!deepest) return { root, match: null };
+
+  // Every candidate folder is a prefix of the same identifier path, so read
+  // the ancestor Package managers once instead of once per candidate.
+  const inherited: PackageManager[] = [root.packageManager];
+  let ancestor = workspaceRoot;
+  for (let index = 0; index < deepest.length - 1; index += 1) {
+    ancestor = path.join(ancestor, deepest[index]);
+    inherited.push(
+      (await detectPackage(ancestor, "", inherited[index])).packageManager,
+    );
+  }
+
+  for (const { relDir, scriptName } of candidates) {
+    const segments = relativeSegments(relDir);
+    if (!segments) continue;
+    const directory = await resolveExistingDirectory(workspaceRoot, segments);
+    if (!directory) continue;
+
+    const detected = await detectPackage(
+      directory,
+      relDir,
+      inherited[Math.max(0, segments.length - 1)],
+    );
+    if (detected.status !== "ok") continue;
+
+    const script = detected.scripts.find((s) => s.name === scriptName);
+    if (script) {
+      return { root, match: { package: detected, script } };
+    }
+  }
+
+  return { root, match: null };
 }
 
 export async function resolveEntry(
@@ -41,32 +231,47 @@ export async function resolveEntry(
   }
 
   if (entryKeyString.startsWith("script:")) {
-    const scriptName = entryKeyString.slice("script:".length);
-    const detection = await detectScripts(paths.directory);
-    if (detection.status !== "ok") {
+    const identifier = entryKeyString.slice("script:".length);
+    const { root, match } = await findScriptByIdentifier(
+      await fs.realpath(paths.directory),
+      identifier,
+    );
+
+    if (!match) {
+      if (root.status !== "ok") {
+        throw new Error(
+          `ENTRY_NOT_FOUND: Cannot resolve script "${identifier}": package.json is ${root.status}`,
+        );
+      }
       throw new Error(
-        `ENTRY_NOT_FOUND: Cannot resolve script "${scriptName}": package.json is ${detection.status}`,
+        `ENTRY_NOT_FOUND: Script "${identifier}" not found`,
       );
     }
 
-    const found = detection.scripts.find((s) => s.name === scriptName);
-    if (!found) {
-      throw new Error(
-        `ENTRY_NOT_FOUND: Script "${scriptName}" not found in package.json`,
-      );
-    }
+    return entryForScript(entryKeyString, match.package, match.script);
+  }
 
-    return {
-      key: entryKeyString,
-      label: found.name,
-      command: found.command,
-      terminalName: terminalName("script", found.name),
-    };
+  if (entryKeyString.startsWith("shell:")) {
+    const relPath = entryKeyString.slice("shell:".length);
+    const script = await findShellScript(
+      await fs.realpath(paths.directory),
+      relPath,
+    );
+    if (!script) {
+      throw new Error(`ENTRY_NOT_FOUND: Shell script "${relPath}" not found`);
+    }
+    return entryForShellScript(entryKeyString, script);
   }
 
   throw new Error(`ENTRY_NOT_FOUND: Invalid entry key ${entryKeyString}`);
 }
 
+/**
+ * Resolves a `/snippet` name: exact Snippet, exact Root package Script, exact
+ * Shell script path, exact Qualified name, then a unique case-insensitive
+ * match. Nested Scripts answer to both their Qualified name and their short
+ * name; Shell scripts answer to their path and basename.
+ */
 export async function resolveEntryByName(
   settings: PluginSettings<typeof snippetsSettings.schema>,
   name: string,
@@ -78,24 +283,61 @@ export async function resolveEntryByName(
     paths,
   );
 
-  let scripts: DetectedScript[] = [];
+  let packages: DetectedPackage[] = [];
+  let shellScripts: ShellScript[] = [];
   try {
-    const detection = await detectScripts(paths.directory);
-    if (detection.status === "ok") {
-      scripts = detection.scripts;
-    }
+    const discovery = await discoverEntries(paths.directory);
+    packages = discovery.packages;
+    shellScripts = discovery.shellScripts;
   } catch {
-    // If detectScripts threw, scripts list is empty
+    // A failed scan still leaves Snippets available
   }
 
-  const availableNames = [
-    ...snippets.map((s) => s.name),
-    ...scripts.map((sc) => sc.name),
-  ];
-  const availableDisplay =
-    availableNames.length > 0 ? availableNames.join(", ") : "none";
+  const root = packages.find((pkg) => pkg.relDir === "");
+  const rootScripts = root?.status === "ok" ? root.scripts : [];
 
-  // 1. Exact snippet name
+  const rootCandidates: NameCandidate[] = [];
+  if (root) {
+    for (const script of rootScripts) {
+      rootCandidates.push({
+        names: [script.name],
+        displayName: script.name,
+        relDir: "",
+        entry: entryForScript(entryKey("script", script.name), root, script),
+      });
+    }
+  }
+
+  const nestedCandidates: NameCandidate[] = [];
+  for (const pkg of packages) {
+    if (pkg.relDir === "" || pkg.status !== "ok") continue;
+    for (const script of pkg.scripts) {
+      const qualified = qualifiedScriptName(pkg.relDir, script.name);
+      nestedCandidates.push({
+        names: [script.name, qualified],
+        displayName: qualified,
+        relDir: pkg.relDir,
+        entry: entryForScript(entryKey("script", qualified), pkg, script),
+      });
+    }
+  }
+
+  const shellCandidates: NameCandidate[] = [];
+  for (const script of shellScripts) {
+    const basename = script.path.slice(script.path.lastIndexOf("/") + 1);
+    const names = [script.path, basename];
+    if (basename.endsWith(".sh")) {
+      names.push(basename.slice(0, -".sh".length));
+    }
+    shellCandidates.push({
+      names,
+      displayName: script.path,
+      relDir: "",
+      entry: entryForShellScript(entryKey("shell", script.path), script),
+    });
+  }
+
+  // 1. Exact Snippet name
   const exactSnippet = snippets.find((s) => s.name === name);
   if (exactSnippet) {
     return {
@@ -106,63 +348,95 @@ export async function resolveEntryByName(
     };
   }
 
-  // 2. Exact script name
-  const exactScript = scripts.find((sc) => sc.name === name);
-  if (exactScript) {
-    return {
-      key: entryKey("script", exactScript.name),
-      label: exactScript.name,
-      command: exactScript.command,
-      terminalName: terminalName("script", exactScript.name),
-    };
-  }
+  // 2. Exact Root package Script
+  const exactRootScript = rootCandidates.find((c) => c.displayName === name);
+  if (exactRootScript) return exactRootScript.entry;
 
-  // 3. Case-insensitive unique prefix across both
+  // 3. Exact Shell script relative path
+  const exactShellScript = shellCandidates.find(
+    (c) => c.displayName === name,
+  );
+  if (exactShellScript) return exactShellScript.entry;
+
+  // 4. Exact Qualified name. When a Script name itself contains a slash two
+  // Packages can produce the same string, so prefer the one a `script:` key
+  // resolves to: the longest Package folder wins.
+  const exactQualified = nestedCandidates
+    .filter((c) => c.displayName === name)
+    .sort((a, b) => b.relDir.length - a.relDir.length)[0];
+  if (exactQualified) return exactQualified.entry;
+
+  // 5. Case-insensitive unique match: prefix across Snippets and Scripts,
+  // equality on Shell script paths and basenames. An exact name beats
+  // prefix-only matches, so Root `develop` does not make `/snippet dev`
+  // ambiguous when one Nested Script is literally `dev`.
   const lower = name.toLowerCase();
-  interface Candidate {
-    name: string;
-    entry: ResolvedEntry;
-  }
-  const prefixCandidates: Candidate[] = [];
+  const matched: NameCandidate[] = [];
+  const matchedKeys = new Set<string>();
+  const addCandidate = (candidate: NameCandidate) => {
+    if (matchedKeys.has(candidate.entry.key)) return;
+    matchedKeys.add(candidate.entry.key);
+    matched.push(candidate);
+  };
 
-  for (const s of snippets) {
-    if (s.name.toLowerCase().startsWith(lower)) {
-      prefixCandidates.push({
-        name: s.name,
-        entry: {
-          key: entryKey("snippet", s.id),
-          label: s.name,
-          command: s.command,
-          terminalName: terminalName("snippet", s.name),
-        },
-      });
+  for (const snippet of snippets) {
+    if (!snippet.name.toLowerCase().startsWith(lower)) continue;
+    addCandidate({
+      names: [snippet.name],
+      displayName: snippet.name,
+      relDir: "",
+      entry: {
+        key: entryKey("snippet", snippet.id),
+        label: snippet.name,
+        command: snippet.command,
+        terminalName: terminalName("snippet", snippet.name),
+      },
+    });
+  }
+
+  for (const candidate of [...rootCandidates, ...nestedCandidates]) {
+    if (
+      candidate.names.some((candidateName) =>
+        candidateName.toLowerCase().startsWith(lower),
+      )
+    ) {
+      addCandidate(candidate);
     }
   }
 
-  for (const sc of scripts) {
-    if (sc.name.toLowerCase().startsWith(lower)) {
-      prefixCandidates.push({
-        name: sc.name,
-        entry: {
-          key: entryKey("script", sc.name),
-          label: sc.name,
-          command: sc.command,
-          terminalName: terminalName("script", sc.name),
-        },
-      });
+  for (const candidate of shellCandidates) {
+    if (
+      candidate.names.some(
+        (candidateName) => candidateName.toLowerCase() === lower,
+      )
+    ) {
+      addCandidate(candidate);
     }
   }
 
-  if (prefixCandidates.length === 1) {
-    return prefixCandidates[0].entry;
-  }
+  const exactMatches = matched.filter((candidate) =>
+    candidate.names.some(
+      (candidateName) => candidateName.toLowerCase() === lower,
+    ),
+  );
+  const finalists = exactMatches.length > 0 ? exactMatches : matched;
 
-  if (prefixCandidates.length === 0) {
+  if (finalists.length === 1) return finalists[0].entry;
+
+  if (finalists.length === 0) {
+    const availableNames = [
+      ...snippets.map((s) => s.name),
+      ...rootCandidates.map((c) => c.displayName),
+      ...nestedCandidates.map((c) => c.displayName),
+      ...shellCandidates.map((c) => c.displayName),
+    ];
+    const availableDisplay =
+      availableNames.length > 0 ? availableNames.join(", ") : "none";
     throw new Error(
       `ENTRY_NOT_FOUND: no snippet or script named "${name}". Available: ${availableDisplay}`,
     );
   }
 
-  const matchNames = prefixCandidates.map((c) => c.name).join(", ");
+  const matchNames = finalists.map((c) => c.displayName).join(", ");
   throw new Error(`AMBIGUOUS_NAME: "${name}" matches ${matchNames}`);
 }

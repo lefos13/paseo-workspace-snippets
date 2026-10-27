@@ -1,20 +1,28 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import type {
+  DetectedPackage,
+  DetectedScript,
+  PackageManager,
+} from "../shared/discovery";
 import { scriptCommand } from "../shared/entries";
 
-export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
-
-export interface DetectedScript {
-  name: string;
-  body: string;
-  command: string;
-}
-
-export interface DetectScriptsResult {
-  status: "ok" | "missing" | "invalid";
-  error: string | null;
-  packageManager: PackageManager;
-  scripts: DetectedScript[];
+/**
+ * Shape for a Package that exists but could not be read: discovery and key
+ * resolution report it instead of failing the whole scan.
+ */
+export function invalidPackage(
+  relDir: string,
+  packageManager: PackageManager,
+  error: unknown,
+): DetectedPackage {
+  return {
+    relDir,
+    status: "invalid",
+    error: error instanceof Error ? error.message : String(error),
+    packageManager,
+    scripts: [],
+  };
 }
 
 async function fileExists(filePath: string): Promise<boolean> {
@@ -26,9 +34,19 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-export async function detectScripts(
+/**
+ * Detects one Package: its `package.json` Scripts and Package manager.
+ *
+ * `relDir` is the Package directory relative to the workspace root ("" for the
+ * Root package) and is copied onto the result. `inheritedPackageManager` is
+ * the Package manager of the nearest ancestor Package; a Package's own
+ * `packageManager` field or lockfile wins over it.
+ */
+export async function detectPackage(
   directory: string,
-): Promise<DetectScriptsResult> {
+  relDir: string,
+  inheritedPackageManager: PackageManager = "npm",
+): Promise<DetectedPackage> {
   let realDir: string;
   try {
     realDir = await fs.realpath(directory);
@@ -36,9 +54,10 @@ export async function detectScripts(
     const error = err as { code?: string };
     if (error?.code === "ENOENT") {
       return {
+        relDir,
         status: "missing",
         error: null,
-        packageManager: "npm",
+        packageManager: inheritedPackageManager,
         scripts: [],
       };
     }
@@ -54,9 +73,10 @@ export async function detectScripts(
     const error = err as { code?: string };
     if (error?.code === "ENOENT") {
       return {
+        relDir,
         status: "missing",
         error: null,
-        packageManager: "npm",
+        packageManager: inheritedPackageManager,
         scripts: [],
       };
     }
@@ -77,9 +97,10 @@ export async function detectScripts(
     const error = err as { code?: string };
     if (error?.code === "ENOENT") {
       return {
+        relDir,
         status: "missing",
         error: null,
-        packageManager: "npm",
+        packageManager: inheritedPackageManager,
         scripts: [],
       };
     }
@@ -88,9 +109,10 @@ export async function detectScripts(
 
   if (stats.size > 1024 * 1024) {
     return {
+      relDir,
       status: "invalid",
       error: `package.json exceeds 1 MiB limit (${stats.size} bytes)`,
-      packageManager: "npm",
+      packageManager: inheritedPackageManager,
       scripts: [],
     };
   }
@@ -100,9 +122,10 @@ export async function detectScripts(
     content = await fs.readFile(realFile, "utf-8");
   } catch (err: unknown) {
     return {
+      relDir,
       status: "invalid",
       error: err instanceof Error ? err.message : String(err),
-      packageManager: "npm",
+      packageManager: inheritedPackageManager,
       scripts: [],
     };
   }
@@ -112,25 +135,27 @@ export async function detectScripts(
     parsed = JSON.parse(content);
   } catch (err: unknown) {
     return {
+      relDir,
       status: "invalid",
       error: `Failed to parse package.json: ${err instanceof Error ? err.message : String(err)}`,
-      packageManager: "npm",
+      packageManager: inheritedPackageManager,
       scripts: [],
     };
   }
 
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     return {
+      relDir,
       status: "invalid",
       error: "package.json root is not an object",
-      packageManager: "npm",
+      packageManager: inheritedPackageManager,
       scripts: [],
     };
   }
 
   const pkgRecord = parsed as Record<string, unknown>;
 
-  let pm: PackageManager = "npm";
+  let pm: PackageManager = inheritedPackageManager;
   let pmFromField = false;
   if (typeof pkgRecord.packageManager === "string") {
     const rawPm = pkgRecord.packageManager.split("@")[0].trim().toLowerCase();
@@ -167,6 +192,7 @@ export async function detectScripts(
       Array.isArray(pkgRecord.scripts)
     ) {
       return {
+        relDir,
         status: "invalid",
         error: "package.json scripts field must be an object",
         packageManager: pm,
@@ -186,15 +212,39 @@ export async function detectScripts(
       scripts.push({
         name,
         body,
-        command: scriptCommand(pm, name),
+        command: scriptCommand(pm, name, relDir),
       });
     }
   }
 
   return {
+    relDir,
     status: "ok",
     error: null,
     packageManager: pm,
     scripts,
   };
+}
+
+/**
+ * Package manager a Nested package at `relDir` inherits from its ancestors,
+ * stopping at the workspace root (inclusive) and defaulting to npm.
+ */
+export async function inheritedPackageManager(
+  workspaceRoot: string,
+  relDir: string,
+): Promise<PackageManager> {
+  const segments = relDir.split("/").filter((segment) => segment !== "");
+  if (segments.length === 0) return "npm";
+
+  let pm: PackageManager = (
+    await detectPackage(workspaceRoot, "", "npm")
+  ).packageManager;
+
+  let directory = workspaceRoot;
+  for (const segment of segments.slice(0, -1)) {
+    directory = path.join(directory, segment);
+    pm = (await detectPackage(directory, "", pm)).packageManager;
+  }
+  return pm;
 }

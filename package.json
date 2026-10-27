@@ -1,6 +1,6 @@
 {
   "name": "paseo-workspace-snippets",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "files": [
     "paseo-plugin.json",
     "index.client.tsx",
@@ -14,6 +14,7 @@
     "images/"
   ],
   "scripts": {
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./test/setup.mjs --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

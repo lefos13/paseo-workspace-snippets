@@ -1,12 +1,13 @@
 import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
+import { discoveryOutputSchema } from "./discovery";
 
 export const WorkspaceInput = z.object({
   workspaceId: z.string().min(1),
 });
 
 export const EntryInput = WorkspaceInput.extend({
-  entryKey: z.string().regex(/^(script|snippet):.+$/),
+  entryKey: z.string().regex(/^(script|snippet|shell):.+$/),
 });
 
 export const ProjectInput = z.object({
@@ -14,26 +15,13 @@ export const ProjectInput = z.object({
 });
 
 export const ProjectEntryInput = ProjectInput.extend({
-  entryKey: z.string().regex(/^(script|snippet):.+$/),
+  entryKey: z.string().regex(/^(script|snippet|shell):.+$/),
 });
 
-export const detectScriptsOutput = z.object({
-  status: z.enum(["ok", "missing", "invalid"]),
-  error: z.string().nullable(),
-  packageManager: z.enum(["npm", "pnpm", "yarn", "bun"]),
-  scripts: z.array(
-    z.object({
-      name: z.string(),
-      body: z.string(),
-      command: z.string(),
-    }),
-  ),
-});
-
-export const detectScriptsRpc = defineRpc({
+export const discoverWorkspaceRpc = defineRpc({
   name: "scripts.detect",
   input: WorkspaceInput,
-  output: detectScriptsOutput,
+  output: discoveryOutputSchema,
 });
 
 export const terminalStatesRpc = defineRpc({
@@ -93,10 +81,10 @@ export const listEntriesRpc = defineRpc({
   output: z.object({ names: z.array(z.string()) }),
 });
 
-export const projectDetectRpc = defineRpc({
+export const discoverProjectRpc = defineRpc({
   name: "project.detect",
   input: ProjectInput,
-  output: detectScriptsOutput,
+  output: discoveryOutputSchema,
 });
 
 export const projectStatesRpc = defineRpc({

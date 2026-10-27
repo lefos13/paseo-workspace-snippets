@@ -2,45 +2,51 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
-import { entryKey, terminalName } from "../../shared/entries";
+import type { DetectedPackage } from "../../shared/discovery";
+import {
+  entryKey,
+  qualifiedScriptName,
+  terminalName,
+} from "../../shared/entries";
+import { EntryGroup } from "./EntryGroup";
 import { EntryRow } from "./EntryRow";
+import { usePackageGroupCollapse } from "./packageCollapse";
 import { makeStyles } from "./styles";
 
 export interface ScriptsSectionProps {
   workspaceId?: string | null;
   directory?: string | null;
-  status: "ok" | "missing" | "invalid";
-  error: string | null;
-  packageManager: "npm" | "pnpm" | "yarn" | "bun";
-  scripts: Array<{ name: string; body: string; command: string }>;
+  // Package group collapse state is remembered per project on this device.
+  projectRootPath?: string | null;
+  packages: DetectedPackage[];
+  truncated?: boolean;
+  loadError: string | null;
   showScripts: boolean;
   onToggleShowScripts: () => void;
   openTerminals: Record<string, string>;
   pendingActionEntries: Record<string, boolean>;
   actionsDisabled?: boolean;
-  lastRunKey: string | null;
   entryCanPreview?: (isOpen: boolean) => boolean;
   theme: PluginTheme;
   compact: boolean;
-  onRun: (scriptName: string) => void;
-  onRestart: (scriptName: string) => void;
-  onStop: (scriptName: string) => void;
-  onClose: (scriptName: string) => void;
+  onRun: (entryKey: string) => void;
+  onRestart: (entryKey: string) => void;
+  onStop: (entryKey: string) => void;
+  onClose: (entryKey: string) => void;
 }
 
 export function ScriptsSection({
   workspaceId,
   directory,
-  status,
-  error,
-  packageManager,
-  scripts,
+  projectRootPath,
+  packages,
+  truncated = false,
+  loadError,
   showScripts,
   onToggleShowScripts,
   openTerminals,
   pendingActionEntries,
   actionsDisabled = false,
-  lastRunKey,
   entryCanPreview,
   theme,
   compact,
@@ -50,16 +56,17 @@ export function ScriptsSection({
   onClose,
 }: ScriptsSectionProps) {
   const styles = useMemo(() => makeStyles(theme, compact), [theme, compact]);
+  const { isCollapsed, toggle } = usePackageGroupCollapse(projectRootPath);
 
-  const sectionTitle =
-    status === "ok"
-      ? `Scripts (${packageManager} · package.json)`
-      : "Scripts (package.json)";
+  const visiblePackages = packages.filter(
+    (pkg) => pkg.scripts.length > 0 || pkg.status === "invalid",
+  );
+  const hasPackageJson = packages.some((pkg) => pkg.status !== "missing");
 
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+        <Text style={styles.sectionTitle}>Scripts</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
@@ -83,72 +90,97 @@ export function ScriptsSection({
 
       {showScripts ? (
         <>
-          {error && status !== "invalid" ? (
+          {loadError ? (
             <View style={styles.stateBannerError}>
               <Text style={styles.stateBannerTitle}>Scripts error</Text>
-              <Text style={styles.stateBannerTextDanger}>{error}</Text>
+              <Text style={styles.stateBannerTextDanger}>{loadError}</Text>
             </View>
           ) : null}
 
-          {status === "missing" && !error ? (
+          {!loadError && visiblePackages.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>
-                No package.json in {directory ?? "workspace"}
+                {hasPackageJson
+                  ? "package.json has no scripts"
+                  : `No package.json in ${directory ?? "workspace"}`}
               </Text>
             </View>
           ) : null}
 
-          {status === "invalid" ? (
-            <View style={styles.stateBannerError}>
-              <Text style={styles.stateBannerTitle}>Invalid package.json</Text>
-              <Text style={styles.stateBannerTextDanger}>
-                {error ?? "Failed to parse package.json"}
-              </Text>
-            </View>
-          ) : null}
-
-          {status === "ok" && scripts.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                package.json has no scripts
-              </Text>
-            </View>
-          ) : null}
-
-          {status === "ok" && scripts.length > 0 ? (
-            <View style={styles.list}>
-              {scripts.map((script) => {
-                const termName = terminalName("script", script.name);
-                const eKey = entryKey("script", script.name);
-                const isOpen = Boolean(openTerminals[termName]);
-                const isActionPending = Boolean(pendingActionEntries[eKey]);
-                const showTabHint = lastRunKey === eKey;
+          {!loadError
+            ? visiblePackages.map((pkg) => {
+                const groupLabel = pkg.relDir || "root";
 
                 return (
-                  <EntryRow
-                    key={script.name}
-                    workspaceId={workspaceId}
-                    name={script.name}
-                    command={script.body}
-                    entryKey={eKey}
-                    terminalName={termName}
+                  <EntryGroup
+                    key={pkg.relDir || "."}
+                    label={`${groupLabel} · ${pkg.packageManager}`}
+                    kind="scripts"
+                    collapsed={isCollapsed(pkg.relDir)}
+                    onToggle={() => toggle(pkg.relDir)}
+                    notice={
+                      pkg.status === "invalid" ? (
+                        <View style={styles.stateBannerError}>
+                          <Text style={styles.stateBannerTitle}>
+                            Invalid package.json
+                          </Text>
+                          <Text style={styles.stateBannerTextDanger}>
+                            {pkg.error ?? "Failed to parse package.json"}
+                          </Text>
+                        </View>
+                      ) : null
+                    }
                     theme={theme}
                     compact={compact}
-                    isOpen={isOpen}
-                    isActionPending={isActionPending}
-                    actionsDisabled={actionsDisabled}
-                    showTabHint={showTabHint}
-                    canPreview={
-                      entryCanPreview ? entryCanPreview(isOpen) : undefined
-                    }
-                    onRun={() => onRun(script.name)}
-                    onRestart={() => onRestart(script.name)}
-                    onStop={() => onStop(script.name)}
-                    onClose={() => onClose(script.name)}
-                  />
+                  >
+                    {pkg.scripts.length > 0
+                      ? pkg.scripts.map((script, index) => {
+                          const qualified = qualifiedScriptName(
+                            pkg.relDir,
+                            script.name,
+                          );
+                          const termName = terminalName("script", qualified);
+                          const eKey = entryKey("script", qualified);
+                          const isOpen = Boolean(openTerminals[termName]);
+                          const isActionPending = Boolean(
+                            pendingActionEntries[eKey],
+                          );
+
+                          return (
+                            <EntryRow
+                              key={script.name}
+                              workspaceId={workspaceId}
+                              name={script.name}
+                              command={script.body}
+                              entryKey={eKey}
+                              theme={theme}
+                              compact={compact}
+                              isOpen={isOpen}
+                              isActionPending={isActionPending}
+                              actionsDisabled={actionsDisabled}
+                              showDivider={index > 0}
+                              canPreview={
+                                entryCanPreview
+                                  ? entryCanPreview(isOpen)
+                                  : undefined
+                              }
+                              onRun={() => onRun(eKey)}
+                              onRestart={() => onRestart(eKey)}
+                              onStop={() => onStop(eKey)}
+                              onClose={() => onClose(eKey)}
+                            />
+                          );
+                        })
+                      : null}
+                  </EntryGroup>
                 );
-              })}
-            </View>
+              })
+            : null}
+
+          {!loadError && truncated ? (
+            <Text style={styles.sectionNote}>
+              Scan hit its limit; some Packages may be missing.
+            </Text>
           ) : null}
         </>
       ) : null}

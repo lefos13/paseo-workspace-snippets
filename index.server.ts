@@ -1,6 +1,6 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
+import { discoverEntries } from "./server/discovery";
 import { resolveEntry, resolveEntryByName } from "./server/entries";
-import { detectScripts } from "./server/package-json";
 import {
   closeTerminalEntry,
   getTerminalOutput,
@@ -10,13 +10,13 @@ import {
 } from "./server/terminals";
 import { findLocalWorkspace, resolveProject } from "./server/projects";
 import { resolveWorkspace } from "./server/workspace";
-import { snippetsFor } from "./shared/entries";
+import { qualifiedScriptName, snippetsFor } from "./shared/entries";
 import {
   closeEntryRpc,
-  detectScriptsRpc,
+  discoverWorkspaceRpc,
   entryOutputRpc,
   listEntriesRpc,
-  projectDetectRpc,
+  discoverProjectRpc,
   projectRunEntryRpc,
   projectStatesRpc,
   runByNameRpc,
@@ -60,10 +60,15 @@ export default function contribute(server: PluginServerContext) {
       );
       let scriptNames: string[] = [];
       try {
-        const detection = await detectScripts(ws.directory);
-        if (detection.status === "ok") {
-          scriptNames = detection.scripts.map((s) => s.name);
-        }
+        const discovery = await discoverEntries(ws.directory);
+        scriptNames = discovery.packages.flatMap((pkg) =>
+          pkg.scripts.map((script) =>
+            qualifiedScriptName(pkg.relDir, script.name),
+          ),
+        );
+        scriptNames.push(
+          ...discovery.shellScripts.map((script) => script.path),
+        );
       } catch {
         // non-fatal for listing
       }
@@ -76,12 +81,12 @@ export default function contribute(server: PluginServerContext) {
     }
   });
 
-  server.handle(detectScriptsRpc, async ({ workspaceId }, { paseo }) => {
+  server.handle(discoverWorkspaceRpc, async ({ workspaceId }, { paseo }) => {
     try {
       const ws = await resolveWorkspace(paseo, workspaceId);
-      return await detectScripts(ws.directory);
+      return await discoverEntries(ws.directory);
     } catch (err) {
-      console.error("[snippets] detectScriptsRpc error:", err);
+      console.error("[snippets] discoverWorkspaceRpc error:", err);
       throw err;
     }
   });
@@ -155,12 +160,12 @@ export default function contribute(server: PluginServerContext) {
     },
   );
 
-  server.handle(projectDetectRpc, async ({ projectId }, { paseo }) => {
+  server.handle(discoverProjectRpc, async ({ projectId }, { paseo }) => {
     try {
       const project = await resolveProject(paseo, projectId);
-      return await detectScripts(project.projectRootPath);
+      return await discoverEntries(project.projectRootPath);
     } catch (err) {
-      console.error("[snippets] projectDetectRpc error:", err);
+      console.error("[snippets] discoverProjectRpc error:", err);
       throw err;
     }
   });

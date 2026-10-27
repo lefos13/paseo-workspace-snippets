@@ -13,15 +13,14 @@ export interface SnippetsSectionProps {
   snippets: Snippet[];
   openTerminals: Record<string, string>;
   pendingActionEntries: Record<string, boolean>;
-  lastRunSnippetId: string | null;
   actionsDisabled?: boolean;
   entryCanPreview?: (isOpen: boolean) => boolean;
   theme: PluginTheme;
   compact: boolean;
-  onRun: (snippet: Snippet) => void;
-  onRestart: (snippet: Snippet) => void;
-  onStop: (snippet: Snippet) => void;
-  onClose: (snippet: Snippet) => void;
+  onRun: (entryKey: string) => void;
+  onRestart: (entryKey: string) => void;
+  onStop: (entryKey: string) => void;
+  onClose: (entryKey: string) => void;
   onAdd: () => void;
   onEdit: (snippet: Snippet) => void;
   onDelete: (snippet: Snippet) => void;
@@ -33,7 +32,6 @@ export function SnippetsSection({
   snippets,
   openTerminals,
   pendingActionEntries,
-  lastRunSnippetId,
   actionsDisabled = false,
   entryCanPreview,
   theme,
@@ -71,12 +69,12 @@ export function SnippetsSection({
           </Text>
         </View>
       ) : (
-        <View style={styles.list}>
-          {snippets.map((snippet) => {
+        <View style={styles.entryList}>
+          {snippets.map((snippet, index) => {
             const termName = terminalName("snippet", snippet.name);
             const isOpen = Boolean(openTerminals[termName]);
-            const isActionPending = Boolean(pendingActionEntries[snippet.id]);
-            const showTabHint = lastRunSnippetId === snippet.id;
+            const key = entryKey("snippet", snippet.id);
+            const isActionPending = Boolean(pendingActionEntries[key]);
 
             return (
               <EntryRow
@@ -85,21 +83,20 @@ export function SnippetsSection({
                 name={snippet.name}
                 command={snippet.command}
                 scope={snippet.scope}
-                entryKey={entryKey("snippet", snippet.id)}
-                terminalName={termName}
+                entryKey={key}
                 theme={theme}
                 compact={compact}
                 isOpen={isOpen}
                 isActionPending={isActionPending}
                 actionsDisabled={actionsDisabled}
-                showTabHint={showTabHint}
+                showDivider={index > 0}
                 canPreview={
                   entryCanPreview ? entryCanPreview(isOpen) : undefined
                 }
-                onRun={() => onRun(snippet)}
-                onRestart={() => onRestart(snippet)}
-                onStop={() => onStop(snippet)}
-                onClose={() => onClose(snippet)}
+                onRun={() => onRun(key)}
+                onRestart={() => onRestart(key)}
+                onStop={() => onStop(key)}
+                onClose={() => onClose(key)}
                 onEdit={() => onEdit(snippet)}
                 onDelete={() => onDelete(snippet)}
               />
