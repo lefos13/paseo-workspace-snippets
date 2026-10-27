@@ -32,9 +32,22 @@ export function shellQuote(str: string): string {
   return `'${str.replace(/'/g, "'\\''")}'`;
 }
 
+/**
+ * Name of a Script that is unique across Packages: `<relDir>/<name>` for a
+ * Nested package, bare `<name>` for the Root package.
+ */
+export function qualifiedScriptName(
+  relDir: string,
+  scriptName: string,
+): string {
+  return relDir ? `${relDir}/${scriptName}` : scriptName;
+}
+
 export function scriptCommand(
   pm: "npm" | "pnpm" | "yarn" | "bun",
   scriptName: string,
+  relDir = "",
 ): string {
-  return `${pm} run ${shellQuote(scriptName)}`;
+  const command = `${pm} run ${shellQuote(scriptName)}`;
+  return relDir ? `cd ${shellQuote(relDir)} && ${command}` : command;
 }

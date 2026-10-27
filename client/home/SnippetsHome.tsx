@@ -507,7 +507,9 @@ export function SnippetsHome({
               <ScriptsSection
                 workspaceId={workspaceId}
                 directory={selectedProject.projectRootPath}
+                projectRootPath={selectedProject.projectRootPath}
                 packages={packages}
+                truncated={discoveryData?.truncated ?? false}
                 loadError={discoveryError}
                 showScripts={showScripts}
                 onToggleShowScripts={handleToggleShowScripts}

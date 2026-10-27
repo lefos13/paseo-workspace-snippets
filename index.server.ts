@@ -10,7 +10,7 @@ import {
 } from "./server/terminals";
 import { findLocalWorkspace, resolveProject } from "./server/projects";
 import { resolveWorkspace } from "./server/workspace";
-import { snippetsFor } from "./shared/entries";
+import { qualifiedScriptName, snippetsFor } from "./shared/entries";
 import {
   closeEntryRpc,
   discoverWorkspaceRpc,
@@ -62,7 +62,9 @@ export default function contribute(server: PluginServerContext) {
       try {
         const discovery = await discoverEntries(ws.directory);
         scriptNames = discovery.packages.flatMap((pkg) =>
-          pkg.scripts.map((script) => script.name),
+          pkg.scripts.map((script) =>
+            qualifiedScriptName(pkg.relDir, script.name),
+          ),
         );
       } catch {
         // non-fatal for listing

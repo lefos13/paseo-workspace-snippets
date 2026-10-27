@@ -56,10 +56,21 @@ export function makeStyles(theme: PluginTheme, compact: boolean) {
     packageGroup: {
       gap: 8,
     },
+    packageGroupHeaderRow: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 6,
+      paddingVertical: 2,
+    },
     packageGroupHeader: {
       fontSize: 12,
       fontWeight: "600" as const,
       fontFamily: "monospace",
+      color: theme.colors.foregroundMuted,
+    },
+    sectionNote: {
+      fontSize: 11,
+      lineHeight: 16,
       color: theme.colors.foregroundMuted,
     },
     // Entry list: one bordered container, thin dividers between rows.

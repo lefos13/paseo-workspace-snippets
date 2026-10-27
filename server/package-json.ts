@@ -20,11 +20,14 @@ async function fileExists(filePath: string): Promise<boolean> {
  * Detects one Package: its `package.json` Scripts and Package manager.
  *
  * `relDir` is the Package directory relative to the workspace root ("" for the
- * Root package) and is copied onto the result.
+ * Root package) and is copied onto the result. `inheritedPackageManager` is
+ * the Package manager of the nearest ancestor Package; a Package's own
+ * `packageManager` field or lockfile wins over it.
  */
 export async function detectPackage(
   directory: string,
   relDir: string,
+  inheritedPackageManager: PackageManager = "npm",
 ): Promise<DetectedPackage> {
   let realDir: string;
   try {
@@ -36,7 +39,7 @@ export async function detectPackage(
         relDir,
         status: "missing",
         error: null,
-        packageManager: "npm",
+        packageManager: inheritedPackageManager,
         scripts: [],
       };
     }
@@ -55,7 +58,7 @@ export async function detectPackage(
         relDir,
         status: "missing",
         error: null,
-        packageManager: "npm",
+        packageManager: inheritedPackageManager,
         scripts: [],
       };
     }
@@ -79,7 +82,7 @@ export async function detectPackage(
         relDir,
         status: "missing",
         error: null,
-        packageManager: "npm",
+        packageManager: inheritedPackageManager,
         scripts: [],
       };
     }
@@ -91,7 +94,7 @@ export async function detectPackage(
       relDir,
       status: "invalid",
       error: `package.json exceeds 1 MiB limit (${stats.size} bytes)`,
-      packageManager: "npm",
+      packageManager: inheritedPackageManager,
       scripts: [],
     };
   }
@@ -104,7 +107,7 @@ export async function detectPackage(
       relDir,
       status: "invalid",
       error: err instanceof Error ? err.message : String(err),
-      packageManager: "npm",
+      packageManager: inheritedPackageManager,
       scripts: [],
     };
   }
@@ -117,7 +120,7 @@ export async function detectPackage(
       relDir,
       status: "invalid",
       error: `Failed to parse package.json: ${err instanceof Error ? err.message : String(err)}`,
-      packageManager: "npm",
+      packageManager: inheritedPackageManager,
       scripts: [],
     };
   }
@@ -127,14 +130,14 @@ export async function detectPackage(
       relDir,
       status: "invalid",
       error: "package.json root is not an object",
-      packageManager: "npm",
+      packageManager: inheritedPackageManager,
       scripts: [],
     };
   }
 
   const pkgRecord = parsed as Record<string, unknown>;
 
-  let pm: PackageManager = "npm";
+  let pm: PackageManager = inheritedPackageManager;
   let pmFromField = false;
   if (typeof pkgRecord.packageManager === "string") {
     const rawPm = pkgRecord.packageManager.split("@")[0].trim().toLowerCase();
@@ -191,7 +194,7 @@ export async function detectPackage(
       scripts.push({
         name,
         body,
-        command: scriptCommand(pm, name),
+        command: scriptCommand(pm, name, relDir),
       });
     }
   }
@@ -203,4 +206,27 @@ export async function detectPackage(
     packageManager: pm,
     scripts,
   };
+}
+
+/**
+ * Package manager a Nested package at `relDir` inherits from its ancestors,
+ * stopping at the workspace root (inclusive) and defaulting to npm.
+ */
+export async function inheritedPackageManager(
+  workspaceRoot: string,
+  relDir: string,
+): Promise<PackageManager> {
+  const segments = relDir.split("/").filter((segment) => segment !== "");
+  if (segments.length === 0) return "npm";
+
+  let pm: PackageManager = (
+    await detectPackage(workspaceRoot, "", "npm")
+  ).packageManager;
+
+  let directory = workspaceRoot;
+  for (const segment of segments.slice(0, -1)) {
+    directory = path.join(directory, segment);
+    pm = (await detectPackage(directory, "", pm)).packageManager;
+  }
+  return pm;
 }

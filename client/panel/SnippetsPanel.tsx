@@ -586,7 +586,9 @@ export function SnippetsPanel({
           <ScriptsSection
             workspaceId={workspaceId}
             directory={workspace?.directory}
+            projectRootPath={workspace?.projectRootPath}
             packages={packages}
+            truncated={discoveryData?.truncated ?? false}
             loadError={discoveryError}
             showScripts={showScripts}
             onToggleShowScripts={handleToggleShowScripts}
